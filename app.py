@@ -5,86 +5,144 @@ import os
 # 1. 페이지 설정
 st.set_page_config(page_title="낙동강 상류 조서 조회 서비스", layout="wide", initial_sidebar_state="collapsed")
 
-# [터보 엔진 1] 데이터 로딩 최적화 (캐싱)
-@st.cache_data(show_spinner="데이터를 불러오는 중입니다...")
-def get_processed_df(file_path):
-    if not os.path.exists(file_path):
-        return None
-    # 엑셀 읽기 속도 최적화 (엔진 지정)
-    df_raw = pd.read_excel(file_path, sheet_name=0, header=1, engine='openpyxl')
-    df = df_raw.iloc[:, :10].copy()
-    df.columns = ['구역', '시군', '읍면', '동리', '번지', '지목', '지적_m2', '편입면적_m2', '소유자_주소', '소유자_성명']
-    # 숫자가 아닌 데이터 예외 처리
-    df['지적_m2'] = pd.to_numeric(df['지적_m2'], errors='coerce').fillna(0)
-    df['편입면적_m2'] = pd.to_numeric(df['편입면적_m2'], errors='coerce').fillna(0)
-    return df
-
-# UI 디자인 (기존 스타일 유지하며 성능 최적화)
+# 2. [최종] 디자인 통일 및 렉 방지 스타일링
+# 모든 글자 크기를 검색 조건(Popover) 수준으로 통일합니다.
 st.markdown("""
     <style>
     .stApp { background-color: #f8fafc; }
-    .property-card { padding: 15px; border-radius: 12px; margin-bottom: 12px; border: 1px solid #e2e8f0; box-shadow: 0 2px 4px rgba(0,0,0,0.03); }
-    .national-card { background-color: #f0f7ff; border-left: 5px solid #3b82f6; }
-    .private-card { background-color: #ffffff; border-left: 5px solid #e2e8f0; }
-    /* 모바일에서 텍스트가 겹치지 않게 미세 조정 */
-    .owner-badge { font-size: 0.8rem; padding: 2px 8px; border-radius: 6px; border: 1px solid #dbeafe; background: white; white-space: nowrap; }
-    </style>
-""", unsafe_allow_html=True)
+    
+    /* 전체 글자 크기 통일 (0.75rem~0.85rem 사이로 아주 촘촘하게) */
+    html, body, [class*="css"] { font-size: 0.82rem; } 
+    
+    /* 타이틀 크기 조정 (검색 버튼과 균형) */
+    .main-service-title { 
+        font-size: 1.0rem !important; 
+        font-weight: 800; 
+        color: #1e3a8a; 
+        text-align: center; 
+        margin-bottom: 15px; 
+    }
+    
+    /* 검색 팝오버 버튼 디자인 */
+    div[data-testid="stPopover"] > button {
+        width: 100%; height: 42px !important;
+        font-size: 0.85rem !important; font-weight: 800 !important;
+        border-radius: 10px !important; background-color: #2563eb !important;
+        color: white !important; border: none !important;
+    }
 
-st.title("낙동강 상류 조서 조회 서비스")
+    /* 필터 내부 입력창 0.65rem 적용 */
+    div[data-testid="stPopover"] label, 
+    div[data-testid="stPopover"] div[data-baseweb="select"], 
+    div[data-testid="stPopover"] input {
+        font-size: 0.65rem !important; 
+    }
+    
+    /* 필지 카드 디자인 (배경색으로만 구분) */
+    .property-card {
+        padding: 12px; border-radius: 10px; 
+        box-shadow: 0 2px 6px rgba(0,0,0,0.04); margin-bottom: 12px; 
+        border: 1px solid #e2e8f0;
+    }
+
+    /* 국유지: 연파랑 배경 + 왼쪽 블루 바 */
+    .national-card { background-color: #f0f7ff; border-left: 5px solid #3b82f6; }
+
+    /* 사유지: 순백색 배경 + 왼쪽 회색 바 */
+    .private-card { background-color: #ffffff; border-left: 5px solid #e2e8f0; }
+
+    /* 좌우 분할 헤더 및 텍스트 크기 통일 */
+    .card-header-flex { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 8px; }
+    .address-text { font-size: 0.82rem; font-weight: 800; color: #0f172a; line-height: 1.3; }
+    .owner-badge {
+        font-size: 0.65rem; font-weight: 700; color: #2563eb;
+        background-color: #ffffff; padding: 2px 8px; border-radius: 4px;
+        white-space: nowrap; border: 1px solid #dbeafe;
+    }
+
+    /* 데이터 그리드 스타일 */
+    .info-container { 
+        display: flex; justify-content: space-between; 
+        background-color: rgba(248, 250, 252, 0.5); 
+        padding: 8px; border-radius: 6px; 
+    }
+    .label { font-size: 0.65rem; color: #64748b; }
+    .value { font-size: 0.8rem; font-weight: 700; color: #1e293b; }
+    .value-red { font-size: 0.8rem; font-weight: 700; color: #ef4444; }
+
+    .map-action-btn {
+        display: block; text-align: center; background-color: #03c75a; color: white !important; 
+        padding: 8px; border-radius: 8px; text-decoration: none !important; 
+        font-weight: 800; font-size: 0.75rem; margin-top: 10px;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+# [데이터 캐싱 로직] 렉 방지를 위해 필수
+@st.cache_data
+def get_river_data(file_path):
+    if os.path.exists(file_path):
+        df_raw = pd.read_excel(file_path, sheet_name=0, header=1)
+        df = df_raw.iloc[:, :10].copy()
+        df.columns = ['구역', '시군', '읍면', '동리', '번지', '지목', '지적_m2', '편입면적_m2', '소유자_주소', '소유자_성명']
+        return df
+    return None
+
+st.markdown('<p class="main-service-title">낙동강 상류 조서 조회 서비스</p>', unsafe_allow_html=True)
 
 tab1, tab2 = st.tabs(["하천구역 조회", "폐천부지 조회"])
 
+# --- [Tab 1: 하천구역 서비스] ---
 with tab1:
-    # 지자체 파일 매핑
-    files = {f"{i:02d}": name for i, name in enumerate(["예천군", "구미시", "고령군", "달성군", "달서구", "문경시", "안동시", "의성군", "칠곡군", "상주시", "성주군"], 1)}
-    file_map = {v: f"{k}_{'yecheon' if k=='01' else 'data'}.xlsm" for k, v in files.items()} # 예시 파일명 규칙
+    region_files = {
+        "예천군": "01_yecheon.xlsm", "구미시": "02_gumi.xlsm", "고령군": "03_goryeong.xlsm",
+        "달성군": "04_dalseong.xlsm", "달서구": "05_dalseo.xlsm", "문경시": "06_mungyeong.xlsm",
+        "안동시": "07_andong.xlsm", "의성군": "08_uiseong.xlsm", "칠곡군": "09_chilgok.xlsm",
+        "상주시": "10_sangju.xlsm", "성주군": "11_seongju.xlsm"
+    }
 
-    with st.popover("🔍 검색 조건 설정"):
-        sel_reg = st.selectbox("지역", options=list(file_map.keys()), key="r_reg")
-        # 실제 파일명에 맞춰 경로 수정 (예: 01_yecheon.xlsm)
-        actual_path = f"{list(files.keys())[list(files.values()).index(sel_reg)]}_{'yecheon' if sel_reg=='예천군' else 'data'}.xlsm"
+    with st.popover("🔍 지역 및 지번 검색"):
+        selected_region = st.selectbox("🎯 대상 지역", options=list(region_files.keys()), key="river_reg")
+        df = get_river_data(region_files[selected_region])
         
-        # 임시로 기존 파일명 규칙 사용 (매니저님 파일명에 맞춤)
-        path_dict = {"예천군": "01_yecheon.xlsm", "구미시": "02_gumi.xlsm"} # ... 생략
-        df = get_processed_df(path_dict.get(sel_reg, "01_yecheon.xlsm"))
-
         if df is not None:
-            sel_dong = st.selectbox("동/리", options=["전체"] + sorted(df['동리'].dropna().unique().tolist()))
-            search_jb = st.text_input("지번 (Enter 입력)")
+            dong_list = sorted(df['동리'].dropna().unique())
+            target_dong = st.selectbox("📍 동/리", options=["전체 지역"] + list(dong_list), key="river_dong")
+            search_jibun = st.text_input("🏠 지번 입력 (예: 1080-2)", key="river_jibun")
 
     if df is not None:
-        # 필터링 로직
-        res = df.copy()
-        if sel_dong != "전체": res = res[res['동리'] == sel_dong]
-        if search_jb: res = res[res['번지'].astype(str).str.contains(search_jb)]
+        filtered_df = df.copy()
+        if target_dong != "전체 지역":
+            filtered_df = filtered_df[filtered_df['동리'] == target_dong]
+        if search_jibun:
+            filtered_df = filtered_df[filtered_df['번지'].astype(str).str.contains(search_jibun)]
 
-        st.info(f"검색 결과: {len(res)}건")
+        st.markdown(f"**조회: {len(filtered_df):,}건**")
 
-        # [터보 엔진 2] 출력 개수 제한 및 페이징 (렉 방지의 핵심)
-        batch_size = 15
-        for _, row in res.head(batch_size).iterrows():
-            owner = str(row['소유자_주소']) if str(row['소유자_성명']) == '국' else str(row['소유자_성명'])
-            c_type = "national-card" if owner.startswith('국') else "private-card"
+        # 렉 방지를 위해 상위 30개씩 노출
+        for _, row in filtered_df.head(30).iterrows():
+            full_addr = f"{row['시군']} {row['읍면']} {row['동리']} {row['번지']}"
+            # [요청 사항 반영] '국'일 경우 주소에서 부처명 추출
+            owner_raw = str(row['소유자_성명']).strip()
+            display_owner = str(row['소유자_주소']).strip() if owner_raw == '국' else owner_raw
+            
+            is_national = display_owner.startswith('국')
+            card_type = "national-card" if is_national else "private-card"
             
             st.markdown(f"""
-                <div class="property-card {c_type}">
-                    <div style="display:flex; justify-content:space-between;">
-                        <span style="font-weight:800;">📍 {row['동리']} {row['번지']}</span>
-                        <span class="owner-badge">{owner}</span>
+                <div class="property-card {card_type}">
+                    <div class="card-header-flex">
+                        <span class="address-text">📍 {full_addr}</span>
+                        <span class="owner-badge">{display_owner}</span>
                     </div>
-                    <div style="margin-top:8px; font-size:0.9rem; color:#444;">
-                        지적: {row['지적_m2']:,}㎡ / <span style="color:red;">편입: {row['편입면적_m2']:,}㎡</span>
+                    <div class="info-container">
+                        <div><span class="label">지적</span><span class="value">{row['지적_m2']:,}㎡</span></div>
+                        <div style="text-align:right;"><span class="label" style="color:#ef4444;">편입</span><span class="value-red">{row['편입면적_m2']:,}㎡</span></div>
                     </div>
-                    <a href="https://map.naver.com/v5/search/{sel_reg} {row['읍면']} {row['동리']} {row['번지']}" target="_blank" 
-                       style="display:block; margin-top:10px; text-align:center; background:#03c75a; color:white; padding:8px; border-radius:8px; text-decoration:none; font-size:0.8rem;">
-                       지도 확인
-                    </a>
+                    <a href="https://map.naver.com/v5/search/{full_addr}" target="_blank" class="map-action-btn">지도 확인</a>
                 </div>
             """, unsafe_allow_html=True)
-        
-        if len(res) > batch_size:
-            st.warning(f"상위 {batch_size}건만 표시됩니다. 더 정확한 지번을 입력해 검색 범위를 줄여보세요.")
 
+# --- [Tab 2: 폐천부지 서비스] ---
 with tab2:
-    st.write("폐천부지 양식을 기다리고 있습니다.")
+    st.info("폐천부지 엑셀 양식을 공유해 주시면 이곳에 조서 화면을 구성해 드립니다.")
