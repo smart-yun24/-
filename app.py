@@ -2,17 +2,15 @@ import streamlit as st
 import pandas as pd
 import os
 
-# 1. 페이지 설정 (그림 제거 및 타이틀 업데이트)
+# 1. 페이지 설정
 st.set_page_config(page_title="낙동강 상류 조서 조회 서비스", layout="wide", initial_sidebar_state="collapsed")
 
-# 2. 심플 & 클린 UI 디자인 (해치 제거 및 색상 강조)
+# 2. UI 디자인 (해치 제거, 색상 구분 및 글자 크기 최적화)
 st.markdown("""
     <style>
-    /* 전체 배경 및 폰트 크기 유지 */
     .stApp { background-color: #f8fafc; }
     html, body { font-size: 0.98rem; } 
     
-    /* [요청] 타이틀 그림 제거 반영 */
     .main-service-title { 
         font-size: 1.15rem !important; 
         font-weight: 800; 
@@ -21,7 +19,7 @@ st.markdown("""
         margin-bottom: 15px; 
     }
     
-    /* 검색 버튼 스타일 */
+    /* 검색 버튼 */
     div[data-testid="stPopover"] > button {
         width: 100%; height: 50px !important;
         font-size: 1.0rem !important; font-weight: 800 !important;
@@ -36,23 +34,23 @@ st.markdown("""
         font-size: 0.65rem !important; 
     }
     
-    /* [요청] 필지 카드 디자인 (해치 제거, 배경색 유지) */
+    /* 필지 카드 디자인 */
     .property-card {
         padding: 18px; border-radius: 14px; 
         box-shadow: 0 4px 12px rgba(0,0,0,0.05); margin-bottom: 18px; 
         border: 1px solid #e2e8f0;
     }
 
-    /* 국유지: 깔끔한 연파랑 배경 (해치 패턴 삭제) */
+    /* 국유지: 연파랑 배경 (왼쪽 파란색 바 포인트) */
     .national-card {
         background-color: #f0f7ff;
-        border-left: 5px solid #3b82f6; /* 국유지 강조를 위해 왼쪽에 포인트 바 추가 */
+        border-left: 6px solid #3b82f6;
     }
 
-    /* 사유지: 순백색 배경 */
+    /* 사유지: 순백색 배경 (왼쪽 회색 바 포인트) */
     .private-card {
         background-color: #ffffff;
-        border-left: 5px solid #e2e8f0;
+        border-left: 6px solid #e2e8f0;
     }
 
     /* 좌우 분할 헤더 */
@@ -66,12 +64,13 @@ st.markdown("""
         line-height: 1.4; flex: 1; 
     }
 
-    /* 소유자 뱃지 */
+    /* 소유자 뱃지 (상세 정보 표시용) */
     .owner-badge {
-        font-size: 0.8rem; font-weight: 700; color: #2563eb;
-        background-color: rgba(255, 255, 255, 0.8);
+        font-size: 0.82rem; font-weight: 700; color: #2563eb;
+        background-color: #ffffff;
         padding: 4px 10px; border-radius: 8px;
         white-space: nowrap; border: 1px solid #dbeafe;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.05);
     }
 
     /* 지목 뱃지 */
@@ -84,7 +83,7 @@ st.markdown("""
     /* 데이터 그리드 */
     .info-container { 
         display: flex; justify-content: space-between; 
-        background-color: rgba(255, 255, 255, 0.5); 
+        background-color: rgba(248, 250, 252, 0.8); 
         padding: 12px; border-radius: 10px; border: 1px solid rgba(0,0,0,0.03);
     }
     .label { font-size: 0.75rem; color: #64748b; margin-bottom: 2px; display: block; }
@@ -99,10 +98,9 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# 타이틀 업데이트
 st.markdown('<p class="main-service-title">낙동강 상류 조서 조회 서비스</p>', unsafe_allow_html=True)
 
-# 3. 데이터 로딩 설정
+# 3. 데이터 로딩 설정 (항목 10개 고정)
 region_files = {
     "예천군": "01_yecheon.xlsm", "구미시": "02_gumi.xlsm", "고령군": "03_goryeong.xlsm",
     "달성군": "04_dalseong.xlsm", "달서구": "05_dalseo.xlsm", "문경시": "06_mungyeong.xlsm",
@@ -135,14 +133,22 @@ if search_jibun:
 
 st.markdown(f"**현재 조회된 필지: {len(filtered_df):,}건**")
 
-# 5. 카드 출력
+# 5. 결과 카드 출력 (소유자 상세 정보 반영)
 for _, row in filtered_df.head(50).iterrows():
     full_addr = f"{row['시군']} {row['읍면']} {row['동리']} {row['번지']}"
     jimok = str(row['지목'])
     badge_class = f"badge-{jimok}" if jimok in ['천', '임', '제'] else "badge-default"
     
-    owner_name = str(row['소유자_성명'])
-    is_national = owner_name.startswith('국')
+    # [핵심 로직] 국유지의 경우 '성명'에 '국'만 적혀 있으므로, '주소' 필드에서 부처명을 가져옴
+    owner_raw = str(row['소유자_성명']).strip()
+    addr_raw = str(row['소유자_주소']).strip()
+    
+    if owner_raw == '국':
+        display_owner = addr_raw  # 예: '국(환경부)' 표시
+    else:
+        display_owner = owner_raw # 사유지의 경우 성명 그대로 표시
+        
+    is_national = display_owner.startswith('국')
     card_type = "national-card" if is_national else "private-card"
     
     st.markdown(f"""
@@ -150,7 +156,7 @@ for _, row in filtered_df.head(50).iterrows():
             <span class="badge {badge_class}">{jimok}</span>
             <div class="card-header-flex">
                 <span class="address-text">📍 {full_addr}</span>
-                <span class="owner-badge">{owner_name}</span>
+                <span class="owner-badge">{display_owner}</span>
             </div>
             <div class="info-container">
                 <div><span class="label">지적면적</span><span class="value">{row['지적_m2']:,}㎡</span></div>
