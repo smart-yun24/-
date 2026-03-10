@@ -5,43 +5,71 @@ import os
 # 1. 페이지 설정
 st.set_page_config(page_title="낙동강 상류 조서 조회 서비스", layout="wide", initial_sidebar_state="collapsed")
 
-# 2. UI/UX 디자인 (이모지 제거, 배경색 전면 적용, 대시보드 스타일)
+# 2. 유신 시그니처 테마 (Professional Deep Ocean & Glassmorphism)
 st.markdown("""
     <style>
+    /* 전체 배경: 눈이 편안한 Off-white */
     .stApp { background-color: #f8fafc; }
-    html, body { font-size: 0.98rem; }
-    .main-service-title { font-size: 1.0rem !important; font-weight: 800; color: #1e3a8a; text-align: center; margin-bottom: 20px; }
+    html, body { font-size: 0.98rem; font-family: 'Pretendard', -apple-system, sans-serif; }
     
-    /* 요약 현황 전환 버튼 */
-    .stButton > button { width: 100%; border-radius: 8px; font-weight: 700; height: 42px; border: 1px solid #d1d5db; background-color: white; color: #374151; }
-    .stButton > button:hover { border-color: #2563eb; color: #2563eb; }
-
-    /* [분리형 합계 요약] 메트릭 카드 디자인 */
-    .metric-container { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
-    .metric-card {
-        flex: 1; min-width: 160px; background-color: white; padding: 15px; border-radius: 12px;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.05); border: 1px solid #e2e8f0; text-align: center;
+    /* 타이틀 스타일 (1.0rem, Deep Navy) */
+    .main-service-title { 
+        font-size: 1.0rem !important; font-weight: 800; color: #1e3a8a; 
+        text-align: center; margin-bottom: 25px; letter-spacing: -0.02em;
     }
-    .metric-label { font-size: 0.75rem; color: #64748b; margin-bottom: 5px; font-weight: 600; }
-    .metric-value { font-size: 1.1rem; font-weight: 800; color: #1e3a8a; }
-    .metric-value-red { color: #ef4444; }
+    
+    /* 요약 현황 전환 버튼 (Slate 스타일) */
+    .stButton > button { 
+        width: 100%; border-radius: 10px; font-weight: 700; height: 45px; 
+        border: 1px solid #e2e8f0; background-color: white; color: #475569;
+        transition: all 0.2s ease;
+    }
+    .stButton > button:hover { border-color: #1e3a8a; color: #1e3a8a; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
 
-    /* 조서 카드 디자인 */
-    .property-card { padding: 18px; border-radius: 14px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); margin-bottom: 18px; border: 1px solid #e2e8f0; }
-    .national-card { background-color: #f0f7ff; border-left: 6px solid #3b82f6; }
-    .private-card { background-color: #ffffff; border-left: 6px solid #e2e8f0; }
-    
-    .abandoned-card-보전 { background-color: #eff6ff !important; border-left: 6px solid #3b82f6; border: 1px solid #bfdbfe; }
-    .abandoned-card-처분 { background-color: #fff7ed !important; border-left: 6px solid #f59e0b; border: 1px solid #fed7aa; }
+    /* 메트릭 카드 (Glassmorphism Lite) */
+    .metric-container { display: flex; gap: 12px; margin-bottom: 25px; flex-wrap: wrap; }
+    .metric-card {
+        flex: 1; min-width: 170px; background-color: white; padding: 20px; border-radius: 14px;
+        border: 1px solid #f1f5f9; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05);
+        text-align: center;
+    }
+    .metric-label { font-size: 0.75rem; color: #64748b; margin-bottom: 8px; font-weight: 600; }
+    .metric-value { font-size: 1.15rem; font-weight: 800; color: #1e3a8a; }
+    .metric-value-red { color: #dc2626; }
 
-    .address-text { font-size: 1.05rem; font-weight: 800; color: #0f172a; line-height: 1.4; }
-    .owner-badge { font-size: 0.82rem; font-weight: 700; color: #2563eb; background-color: #ffffff; padding: 3px 10px; border-radius: 8px; border: 1px solid #dbeafe; }
-    .info-container { display: flex; justify-content: space-between; background: rgba(255, 255, 255, 0.4); padding: 12px; border-radius: 10px; }
+    /* 조서 카드 공통 디자인 */
+    .property-card { 
+        padding: 20px; border-radius: 16px; margin-bottom: 20px; 
+        border: 1px solid #f1f5f9; background-color: white;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+        transition: transform 0.2s ease;
+    }
+    .property-card:hover { transform: translateY(-2px); box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); }
     
-    div[data-testid="stPopover"] > button { width: 100%; height: 45px !important; font-size: 0.85rem !important; font-weight: 800 !important; background-color: #2563eb !important; color: white !important; border-radius: 10px !important; }
-    .map-btn { display: block; text-align: center; background-color: #03c75a !important; color: white !important; padding: 12px; border-radius: 10px; text-decoration: none !important; font-weight: 800; font-size: 0.95rem; margin-top: 15px; }
+    /* 카드 사이드 보더 강조 (전문성 강화) */
+    .national-card { border-left: 5px solid #1e3a8a; }
+    .private-card { border-left: 5px solid #94a3b8; }
     
-    .filter-box { background-color: #ffffff; padding: 10px 15px; border-radius: 10px; border: 1px solid #e2e8f0; margin-bottom: 15px; }
+    /* 폐천부지 카드 배경색 (요청 반영) */
+    .abandoned-card-보전 { background-color: #f0f7ff !important; border-left: 5px solid #2563eb; border: 1px solid #dbeafe; }
+    .abandoned-card-처분 { background-color: #fff7ed !important; border-left: 5px solid #ea580c; border: 1px solid #ffedd5; }
+
+    .address-text { font-size: 1.05rem; font-weight: 800; color: #0f172a; line-height: 1.5; }
+    .owner-badge { font-size: 0.8rem; font-weight: 700; color: #1e3a8a; background-color: #eff6ff; padding: 4px 12px; border-radius: 8px; border: 1px solid #dbeafe; }
+    
+    /* 데이터 박스 내부 정보창 */
+    .info-container { display: flex; justify-content: space-between; background: rgba(255, 255, 255, 0.6); padding: 14px; border-radius: 12px; margin-top: 10px; border: 1px solid rgba(0,0,0,0.03); }
+    
+    /* 지도 버튼 (NAVER 스타일 고수) */
+    .map-btn { 
+        display: block; text-align: center; background-color: #03c75a !important; color: white !important; 
+        padding: 14px; border-radius: 12px; text-decoration: none !important; 
+        font-weight: 800; font-size: 0.95rem; margin-top: 18px; 
+        box-shadow: 0 4px 6px rgba(3, 199, 90, 0.2);
+    }
+    
+    /* 필터 박스 */
+    .filter-box { background-color: white; padding: 15px 20px; border-radius: 14px; border: 1px solid #e2e8f0; margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
     </style>
 """, unsafe_allow_html=True)
 
@@ -102,7 +130,6 @@ with tab0:
     sum_df = get_summary(river_files if current_mode == 'river' else delete_files, current_mode)
     
     if not sum_df.empty:
-        # [요청 반영] 전체 합계를 표 밖으로 꺼내서 '메트릭 카드'로 표현
         st.markdown(f"**전체 합계 요약 ({'하천구역' if current_mode == 'river' else '폐천부지'})**")
         st.markdown(f"""
             <div class="metric-container">
@@ -133,13 +160,12 @@ with tab1:
         for _, row in res.head(30).iterrows():
             owner = str(row['주소']).strip() if str(row['성명']).strip() == '국' else str(row['성명']).strip()
             c_type = "national-card" if owner.startswith('국') else "private-card"
-            st.markdown(f"""<div class="property-card {c_type}"><div style="display:flex; justify-content:space-between; margin-bottom:10px;"><span class="address-text">📍 {row['시군']} {row['동리']} {row['번지']}</span><span class="owner-badge">{owner}</span></div><div class="info-container"><div><span style="font-size:0.7rem;">지적면적</span><br/><b>{row['지적']:,}㎡</b></div><div style="text-align:right;"><span style="font-size:0.7rem; color:red;">편입면적</span><br/><b>{row['편입']:,}㎡</b></div></div><a href="https://map.naver.com/v5/search/{row['시군']} {row['동리']} {row['번지']}" target="_blank" class="map-btn">지도확인(NAVER)</a></div>""", unsafe_allow_html=True)
+            st.markdown(f"""<div class="property-card {c_type}"><div style="display:flex; justify-content:space-between; margin-bottom:10px;"><span class="address-text">📍 {row['시군']} {row['동리']} {row['번지']}</span><span class="owner-badge">{owner}</span></div><div class="info-container"><div><span style="font-size:0.75rem; color:#64748b;">지적면적</span><br/><b>{row['지적']:,}㎡</b></div><div style="text-align:right;"><span style="font-size:0.75rem; color:#dc2626;">편입면적</span><br/><b style="color:#dc2626;">{row['편입']:,}㎡</b></div></div><a href="https://map.naver.com/v5/search/{row['시군']} {row['동리']} {row['번지']}" target="_blank" class="map-btn">지도확인(NAVER)</a></div>""", unsafe_allow_html=True)
 
 # --- [Tab 2: 폐천부지 조회] ---
 with tab2:
-    # [요청 반영] 필터를 밖으로 꺼냄
     st.markdown('<div class="filter-box">', unsafe_allow_html=True)
-    st.write("관리계획 필터")
+    st.write("**관리계획 필터**")
     f_col1, f_col2 = st.columns(2)
     with f_col1: check_bojeon = st.checkbox("보전", value=True)
     with f_col2: check_cheobun = st.checkbox("처분", value=True)
@@ -167,4 +193,4 @@ with tab2:
             owner = str(row['주소']).strip() if str(row['성명']).strip() == '국' else str(row['성명']).strip()
             plan_val = str(row['계획']).strip()
             card_cls = "abandoned-card-보전" if "보전" in plan_val else "abandoned-card-처분" if "처분" in plan_val else "abandoned-card-default"
-            st.markdown(f"""<div class="property-card {card_cls}"><div style="display:flex; justify-content:space-between; margin-bottom:10px;"><span class="address-text">📍 {row['시군']} {row['동리']} {row['번지']} <span style="font-size:0.75rem; font-weight:800; border-bottom:2px solid currentColor;">({plan_val})</span></span><span class="owner-badge">{owner}</span></div><div class="info-container"><div><span style="font-size:0.7rem;">지적면적</span><br/><b>{row['지적']:,}㎡</b></div><div style="text-align:right;"><span style="font-size:0.7rem; color:red;">편입면적</span><br/><b>{row['편입']:,}㎡</b></div></div><a href="https://map.naver.com/v5/search/{row['시군']} {row['동리']} {row['번지']}" target="_blank" class="map-btn">지도확인(NAVER)</a></div>""", unsafe_allow_html=True)
+            st.markdown(f"""<div class="property-card {card_cls}"><div style="display:flex; justify-content:space-between; margin-bottom:10px;"><span class="address-text">📍 {row['시군']} {row['동리']} {row['번지']} <span style="font-size:0.75rem; font-weight:800; border-bottom:2px solid currentColor;">({plan_val})</span></span><span class="owner-badge">{owner}</span></div><div class="info-container"><div><span style="font-size:0.75rem; color:#64748b;">지적면적</span><br/><b>{row['지적']:,}㎡</b></div><div style="text-align:right;"><span style="font-size:0.75rem; color:#dc2626;">편입면적</span><br/><b style="color:#dc2626;">{row['편입']:,}㎡</b></div></div><a href="https://map.naver.com/v5/search/{row['시군']} {row['동리']} {row['번지']}" target="_blank" class="map-btn">지도확인(NAVER)</a></div>""", unsafe_allow_html=True)
