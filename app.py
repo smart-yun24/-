@@ -2,27 +2,26 @@ import streamlit as st
 import pandas as pd
 import os
 
-# 1. 페이지 설정 (서비스 명칭 변경 및 레이아웃 최적화)
+# 1. 페이지 설정 (그림 제거 및 타이틀 업데이트)
 st.set_page_config(page_title="낙동강 상류 조서 조회 서비스", layout="wide", initial_sidebar_state="collapsed")
 
-# 2. 고도화된 UI 디자인 (국유지/사유지 배경 차별화 및 글자 크기 확대)
+# 2. 심플 & 클린 UI 디자인 (해치 제거 및 색상 강조)
 st.markdown("""
     <style>
-    /* 전체 배경 및 기본 폰트 크기 확대 (0.85rem -> 0.98rem) */
+    /* 전체 배경 및 폰트 크기 유지 */
     .stApp { background-color: #f8fafc; }
     html, body { font-size: 0.98rem; } 
     
-    /* [요청 3] 메인 타이틀 디자인 */
+    /* [요청] 타이틀 그림 제거 반영 */
     .main-service-title { 
         font-size: 1.15rem !important; 
         font-weight: 800; 
         color: #1e3a8a; 
         text-align: center; 
         margin-bottom: 15px; 
-        letter-spacing: -0.5px;
     }
     
-    /* 팝오버 검색 버튼 */
+    /* 검색 버튼 스타일 */
     div[data-testid="stPopover"] > button {
         width: 100%; height: 50px !important;
         font-size: 1.0rem !important; font-weight: 800 !important;
@@ -30,35 +29,30 @@ st.markdown("""
         color: white !important; border: none !important;
     }
 
-    /* 필터 내부 0.65rem 유지 */
+    /* 필터 내부 0.65rem 설정 */
     div[data-testid="stPopover"] label, 
     div[data-testid="stPopover"] div[data-baseweb="select"], 
     div[data-testid="stPopover"] input {
         font-size: 0.65rem !important; 
     }
     
-    /* [요청 4] 필지 카드 디자인 (국유지 vs 사유지) */
+    /* [요청] 필지 카드 디자인 (해치 제거, 배경색 유지) */
     .property-card {
         padding: 18px; border-radius: 14px; 
         box-shadow: 0 4px 12px rgba(0,0,0,0.05); margin-bottom: 18px; 
-        border: 1px solid #e2e8f0; position: relative; overflow: hidden;
+        border: 1px solid #e2e8f0;
     }
 
-    /* 국유지 전용 스타일: 연한 파랑 배경 + 빗금(Hatch) 패턴 */
+    /* 국유지: 깔끔한 연파랑 배경 (해치 패턴 삭제) */
     .national-card {
         background-color: #f0f7ff;
-        background-image: repeating-linear-gradient(
-            45deg, 
-            transparent, 
-            transparent 10px, 
-            rgba(37, 99, 235, 0.03) 10px, 
-            rgba(37, 99, 235, 0.03) 20px
-        );
+        border-left: 5px solid #3b82f6; /* 국유지 강조를 위해 왼쪽에 포인트 바 추가 */
     }
 
-    /* 사유지 전용 스타일: 순백색 배경 */
+    /* 사유지: 순백색 배경 */
     .private-card {
         background-color: #ffffff;
+        border-left: 5px solid #e2e8f0;
     }
 
     /* 좌우 분할 헤더 */
@@ -72,7 +66,7 @@ st.markdown("""
         line-height: 1.4; flex: 1; 
     }
 
-    /* 소유자 뱃지 (상세 정보 노출) */
+    /* 소유자 뱃지 */
     .owner-badge {
         font-size: 0.8rem; font-weight: 700; color: #2563eb;
         background-color: rgba(255, 255, 255, 0.8);
@@ -105,8 +99,8 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# [요청 3] 타이틀 변경 반영
-st.markdown('<p class="main-service-title">🏞️ 낙동강 상류 조서 조회 서비스</p>', unsafe_allow_html=True)
+# 타이틀 업데이트
+st.markdown('<p class="main-service-title">낙동강 상류 조서 조회 서비스</p>', unsafe_allow_html=True)
 
 # 3. 데이터 로딩 설정
 region_files = {
@@ -141,13 +135,12 @@ if search_jibun:
 
 st.markdown(f"**현재 조회된 필지: {len(filtered_df):,}건**")
 
-# 5. 결과 카드 출력 (국유지/사유지 시각적 구분 적용)
+# 5. 카드 출력
 for _, row in filtered_df.head(50).iterrows():
     full_addr = f"{row['시군']} {row['읍면']} {row['동리']} {row['번지']}"
     jimok = str(row['지목'])
     badge_class = f"badge-{jimok}" if jimok in ['천', '임', '제'] else "badge-default"
     
-    # [요청 1, 4] 소유자 성함 상세화 및 배경 차별화 판단
     owner_name = str(row['소유자_성명'])
     is_national = owner_name.startswith('국')
     card_type = "national-card" if is_national else "private-card"
