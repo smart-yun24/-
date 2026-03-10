@@ -3,15 +3,14 @@ import pandas as pd
 import os
 
 # 1. 페이지 설정
-st.set_page_config(page_title="낙동강 상류 하천구역 조회", layout="wide", initial_sidebar_state="collapsed")
+st.set_page_config(page_title="하천구역 스마트 조회", layout="wide", initial_sidebar_state="collapsed")
 
-# 2. 요청 사항 반영 CSS (버튼 및 내부 폰트 크기 조정)
+# 2. 요청 사항 반영 CSS (아이콘 제거 및 필터 폰트 0.65rem 축소)
 st.markdown("""
     <style>
     .stApp { background-color: #f8fafc; }
     html, body { font-size: 0.85rem; }
     
-    /* [요청 1] 메인 타이틀 및 검색 버튼 크기 동일화 (1.0rem) */
     .mobile-header { 
         font-size: 1.0rem !important; 
         font-weight: 800; 
@@ -20,21 +19,23 @@ st.markdown("""
         margin-bottom: 12px; 
     }
     
+    /* 팝오버 버튼 디자인 */
     div[data-testid="stPopover"] > button {
         width: 100%;
-        height: 50px !important;
-        font-size: 1.0rem !important; /* 타이틀과 동일한 크기 */
+        height: 45px !important;
+        font-size: 1.0rem !important;
         font-weight: 800 !important;
-        border-radius: 12px !important;
+        border-radius: 10px !important;
         background-color: #2563eb !important;
         color: white !important;
-        border: none !important;
     }
 
-    /* [요청 2] 검색창 내부 입력 필드 폰트를 주소 타이틀 크기(0.95rem)와 동일하게 수정 */
-    div[data-baseweb="select"], input {
+    /* [요청] 필터 내부 라벨 및 입력창 폰트 0.65rem으로 축소 */
+    div[data-testid="stPopover"] label, 
+    div[data-testid="stPopover"] div[data-baseweb="select"], 
+    div[data-testid="stPopover"] input {
         font-size: 0.65rem !important; 
-        font-weight: 600 !important;
+        font-weight: 500 !important;
     }
     
     /* 카드 디자인 */
@@ -51,7 +52,7 @@ st.markdown("""
     .badge-제 { background-color: #f1f5f9; color: #475569; }
     .badge-default { background-color: #f3f4f6; color: #374151; }
 
-    /* 주소 및 소유자 텍스트 크기 (0.95rem 기준) */
+    /* 주소 및 소유자 텍스트 */
     .address-text { font-size: 0.95rem; font-weight: 800; color: #0f172a; line-height: 1.3; }
     .owner-tag { font-size: 0.8rem; font-weight: 600; color: #2563eb; margin-top: 2px; }
 
@@ -81,7 +82,7 @@ region_files = {
     "상주시": "10_sangju.xlsm", "성주군": "11_seongju.xlsm"
 }
 
-# 4. 팝오버 내부 설정
+# 4. 팝오버 필터 설정
 with st.popover("🔍 지역 및 지번 검색"):
     selected_region = st.selectbox("🎯 대상 지역", options=list(region_files.keys()))
     file_path = region_files[selected_region]
@@ -112,12 +113,13 @@ for _, row in filtered_df.head(50).iterrows():
     jimok = str(row['지목'])
     badge_class = f"badge-{jimok}" if jimok in ['천', '임', '전', '답', '제'] else "badge-default"
     
+    # [요청] 👤 아이콘 제거 반영
     st.markdown(f"""
         <div class="property-card">
             <span class="badge {badge_class}">{jimok}</span>
             <div class="card-header-box">
                 <span class="address-text">📍 {full_addr}</span>
-                <span class="owner-tag">👤 소유자: {row['소유자_성명']}</span>
+                <span class="owner-tag">소유자: {row['소유자_성명']}</span>
             </div>
             <div class="info-container">
                 <div><span class="label">지적면적</span><br/><span class="value">{row['지적_m2']:,}㎡</span></div>
