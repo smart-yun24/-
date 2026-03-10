@@ -46,30 +46,35 @@ st.markdown("""
     }
     .property-card:hover { transform: translateY(-2px); box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); }
     
-    /* 카드 사이드 보더 강조 (전문성 강화) */
     .national-card { border-left: 5px solid #1e3a8a; }
     .private-card { border-left: 5px solid #94a3b8; }
     
-    /* 폐천부지 카드 배경색 (요청 반영) */
+    /* 폐천부지 카드 배경색 전체 적용 */
     .abandoned-card-보전 { background-color: #f0f7ff !important; border-left: 5px solid #2563eb; border: 1px solid #dbeafe; }
     .abandoned-card-처분 { background-color: #fff7ed !important; border-left: 5px solid #ea580c; border: 1px solid #ffedd5; }
 
     .address-text { font-size: 1.05rem; font-weight: 800; color: #0f172a; line-height: 1.5; }
     .owner-badge { font-size: 0.8rem; font-weight: 700; color: #1e3a8a; background-color: #eff6ff; padding: 4px 12px; border-radius: 8px; border: 1px solid #dbeafe; }
     
-    /* 데이터 박스 내부 정보창 */
     .info-container { display: flex; justify-content: space-between; background: rgba(255, 255, 255, 0.6); padding: 14px; border-radius: 12px; margin-top: 10px; border: 1px solid rgba(0,0,0,0.03); }
     
-    /* 지도 버튼 (NAVER 스타일 고수) */
+    /* 버튼 레이아웃 및 스타일 */
+    .btn-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 18px; }
     .map-btn { 
         display: block; text-align: center; background-color: #03c75a !important; color: white !important; 
-        padding: 14px; border-radius: 12px; text-decoration: none !important; 
-        font-weight: 800; font-size: 0.95rem; margin-top: 18px; 
-        box-shadow: 0 4px 6px rgba(3, 199, 90, 0.2);
+        padding: 12px; border-radius: 10px; text-decoration: none !important; 
+        font-weight: 800; font-size: 0.9rem; box-shadow: 0 4px 6px rgba(3, 199, 90, 0.2);
+    }
+    .eum-btn { 
+        display: block; text-align: center; background-color: #1e3a8a !important; color: white !important; 
+        padding: 12px; border-radius: 10px; text-decoration: none !important; 
+        font-weight: 800; font-size: 0.9rem; box-shadow: 0 4px 6px rgba(30, 58, 138, 0.2);
     }
     
     /* 필터 박스 */
     .filter-box { background-color: white; padding: 15px 20px; border-radius: 14px; border: 1px solid #e2e8f0; margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+    
+    div[data-testid="stPopover"] > button { width: 100%; height: 45px !important; font-size: 0.85rem !important; font-weight: 800 !important; background-color: #2563eb !important; color: white !important; border-radius: 10px !important; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -89,7 +94,7 @@ def get_summary(file_map, mode="river"):
                 nat_count = df[df.columns[owner_idx]].astype(str).str.strip().str.startswith('국').sum()
                 data_list.append({
                     "지역명": region, "필지수": len(df_clean), "국유지(필지)": nat_count, "사유지(필지)": len(df_clean)-nat_count,
-                    "지적면적(㎡)": df_clean['지적'].sum(), "편입면적(㎡)": df_clean['편입'].sum()
+                    "지적면적 합계(㎡)": df_clean['지적'].sum(), "편입면적 합계(㎡)": df_clean['편입'].sum()
                 })
             except: pass
     return pd.DataFrame(data_list)
@@ -108,7 +113,7 @@ def load_file(path, mode="river"):
         return df
     except: return None
 
-# 파일 매핑
+# 파일 리스트 설정
 river_files = { "예천군": "01_yecheon.xlsm", "구미시": "02_gumi.xlsm", "의성군": "08_uiseong.xlsm", "칠곡군": "09_chilgok.xlsm", "성주군": "11_seongju.xlsm", "고령군": "03_goryeong.xlsm", "달성군": "04_dalseong.xlsm", "문경시": "06_mungyeong.xlsm", "안동시": "07_andong.xlsm", "상주시": "10_sangju.xlsm", "달서구": "05_dalseo.xlsm" }
 delete_files = { "예천군": "01_yecheon_delete.xlsm", "구미시": "02_gumi_delete.xlsm", "의성군": "08_uiseong_delete.xlsm" }
 
@@ -136,12 +141,11 @@ with tab0:
                 <div class="metric-card"><div class="metric-label">필지수 합계</div><div class="metric-value">{sum_df["필지수"].sum():,}건</div></div>
                 <div class="metric-card"><div class="metric-label">국유지 합계</div><div class="metric-value">{sum_df["국유지(필지)"].sum():,}건</div></div>
                 <div class="metric-card"><div class="metric-label">사유지 합계</div><div class="metric-value">{sum_df["사유지(필지)"].sum():,}건</div></div>
-                <div class="metric-card"><div class="metric-label">편입면적 합계</div><div class="metric-value metric-value-red">{sum_df["편입면적(㎡)"].sum():,.0f}㎡</div></div>
+                <div class="metric-card"><div class="metric-label">편입면적 합계</div><div class="metric-value metric-value-red">{sum_df["편입면적 합계(㎡)"].sum():,.0f}㎡</div></div>
             </div>
         """, unsafe_allow_html=True)
-        
         st.markdown("**지역별 상세 요약**")
-        st.dataframe(sum_df.style.format({"필지수": "{:,}", "국유지(필지)": "{:,}", "사유지(필지)": "{:,}", "지적면적(㎡)": "{:,.0f}", "편입면적(㎡)": "{:,.0f}"}), use_container_width=True, hide_index=True)
+        st.dataframe(sum_df.style.format({"필지수": "{:,}", "국유지(필지)": "{:,}", "사유지(필지)": "{:,}", "지적면적 합계(㎡)": "{:,.0f}", "편입면적 합계(㎡)": "{:,.0f}"}), use_container_width=True, hide_index=True)
     else: st.info("데이터를 업로드해주세요.")
 
 # --- [Tab 1: 하천구역 조회] ---
@@ -160,7 +164,22 @@ with tab1:
         for _, row in res.head(30).iterrows():
             owner = str(row['주소']).strip() if str(row['성명']).strip() == '국' else str(row['성명']).strip()
             c_type = "national-card" if owner.startswith('국') else "private-card"
-            st.markdown(f"""<div class="property-card {c_type}"><div style="display:flex; justify-content:space-between; margin-bottom:10px;"><span class="address-text">📍 {row['시군']} {row['동리']} {row['번지']}</span><span class="owner-badge">{owner}</span></div><div class="info-container"><div><span style="font-size:0.75rem; color:#64748b;">지적면적</span><br/><b>{row['지적']:,}㎡</b></div><div style="text-align:right;"><span style="font-size:0.75rem; color:#dc2626;">편입면적</span><br/><b style="color:#dc2626;">{row['편입']:,}㎡</b></div></div><a href="https://map.naver.com/v5/search/{row['시군']} {row['동리']} {row['번지']}" target="_blank" class="map-btn">지도확인(NAVER)</a></div>""", unsafe_allow_html=True)
+            st.markdown(f"""
+                <div class="property-card {c_type}">
+                    <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
+                        <span class="address-text">📍 {row['시군']} {row['동리']} {row['번지']}</span>
+                        <span class="owner-badge">{owner}</span>
+                    </div>
+                    <div class="info-container">
+                        <div><span style="font-size:0.75rem; color:#64748b;">지적면적</span><br/><b>{row['지적']:,}㎡</b></div>
+                        <div style="text-align:right;"><span style="font-size:0.75rem; color:#dc2626;">편입면적</span><br/><b style="color:#dc2626;">{row['편입']:,}㎡</b></div>
+                    </div>
+                    <div class="btn-grid">
+                        <a href="https://map.naver.com/v5/search/{row['시군']} {row['동리']} {row['번지']}" target="_blank" class="map-btn">지도확인(NAVER)</a>
+                        <a href="https://www.eum.go.kr/web/am/amMain.jsp?searchType=address&query={row['시군']} {row['동리']} {row['번지']}" target="_blank" class="eum-btn">토지이용확인(이음)</a>
+                    </div>
+                </div>
+            """, unsafe_allow_html=True)
 
 # --- [Tab 2: 폐천부지 조회] ---
 with tab2:
@@ -193,4 +212,19 @@ with tab2:
             owner = str(row['주소']).strip() if str(row['성명']).strip() == '국' else str(row['성명']).strip()
             plan_val = str(row['계획']).strip()
             card_cls = "abandoned-card-보전" if "보전" in plan_val else "abandoned-card-처분" if "처분" in plan_val else "abandoned-card-default"
-            st.markdown(f"""<div class="property-card {card_cls}"><div style="display:flex; justify-content:space-between; margin-bottom:10px;"><span class="address-text">📍 {row['시군']} {row['동리']} {row['번지']} <span style="font-size:0.75rem; font-weight:800; border-bottom:2px solid currentColor;">({plan_val})</span></span><span class="owner-badge">{owner}</span></div><div class="info-container"><div><span style="font-size:0.75rem; color:#64748b;">지적면적</span><br/><b>{row['지적']:,}㎡</b></div><div style="text-align:right;"><span style="font-size:0.75rem; color:#dc2626;">편입면적</span><br/><b style="color:#dc2626;">{row['편입']:,}㎡</b></div></div><a href="https://map.naver.com/v5/search/{row['시군']} {row['동리']} {row['번지']}" target="_blank" class="map-btn">지도확인(NAVER)</a></div>""", unsafe_allow_html=True)
+            st.markdown(f"""
+                <div class="property-card {card_cls}">
+                    <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
+                        <span class="address-text">📍 {row['시군']} {row['동리']} {row['번지']} <span style="font-size:0.75rem; font-weight:800; border-bottom:2px solid currentColor;">({plan_val})</span></span>
+                        <span class="owner-badge">{owner}</span>
+                    </div>
+                    <div class="info-container">
+                        <div><span style="font-size:0.75rem; color:#64748b;">지적면적</span><br/><b>{row['지적']:,}㎡</b></div>
+                        <div style="text-align:right;"><span style="font-size:0.75rem; color:#dc2626;">편입면적</span><br/><b style="color:#dc2626;">{row['편입']:,}㎡</b></div>
+                    </div>
+                    <div class="btn-grid">
+                        <a href="https://map.naver.com/v5/search/{row['시군']} {row['동리']} {row['번지']}" target="_blank" class="map-btn">지도확인(NAVER)</a>
+                        <a href="https://www.eum.go.kr/web/am/amMain.jsp?searchType=address&query={row['시군']} {row['동리']} {row['번지']}" target="_blank" class="eum-btn">토지이용확인(이음)</a>
+                    </div>
+                </div>
+            """, unsafe_allow_html=True)
