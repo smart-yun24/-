@@ -33,7 +33,7 @@ st.markdown("""
 
     /* [요청 2] 검색창 내부 입력 필드 폰트를 주소 타이틀 크기(0.95rem)와 동일하게 수정 */
     div[data-baseweb="select"], input {
-        font-size: 0.95rem !important; 
+        font-size: 0.65rem !important; 
         font-weight: 600 !important;
     }
     
