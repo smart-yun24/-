@@ -5,21 +5,22 @@ import os
 # 1. 페이지 설정
 st.set_page_config(page_title="낙동강 상류 조서 조회 서비스", layout="wide", initial_sidebar_state="collapsed")
 
-# 2. UI 디자인 (문구 수정 및 성능 최적화 스타일)
+# 2. UI 디자인 (타이틀 크기 1.0rem 반영 및 본문 가독성 유지)
 st.markdown("""
     <style>
     .stApp { background-color: #f8fafc; }
     html, body { font-size: 0.98rem; } 
     
+    /* [요청 반영] 최상단 제목 사이즈를 1.0rem으로 확대 */
     .main-service-title { 
-        font-size: 0.85rem !important; 
+        font-size: 1.0rem !important; 
         font-weight: 800; 
         color: #1e3a8a; 
         text-align: center; 
-        margin-bottom: 15px; 
+        margin-bottom: 18px; 
     }
     
-    /* 검색 버튼 스타일 */
+    /* 검색 팝오버 버튼 (기존 0.85rem 유지하여 균형 유지) */
     div[data-testid="stPopover"] > button {
         width: 100%; height: 42px !important;
         font-size: 0.85rem !important; font-weight: 800 !important;
@@ -27,7 +28,14 @@ st.markdown("""
         color: white !important;
     }
 
-    /* 조서 카드 디자인 (해치 없이 색상으로만 구분하여 성능 극대화) */
+    /* 필터 내부 폰트 (0.65rem) */
+    div[data-testid="stPopover"] label, 
+    div[data-testid="stPopover"] div[data-baseweb="select"], 
+    div[data-testid="stPopover"] input {
+        font-size: 0.65rem !important; 
+    }
+    
+    /* 조서 카드 디자인 (단색 배경으로 렉 방지) */
     .property-card {
         padding: 18px; border-radius: 14px; 
         box-shadow: 0 4px 12px rgba(0,0,0,0.05); margin-bottom: 18px; 
@@ -35,7 +43,6 @@ st.markdown("""
     }
     .national-card { background-color: #f0f7ff; border-left: 6px solid #3b82f6; } 
     .private-card { background-color: #ffffff; border-left: 6px solid #e2e8f0; }
-    .abandoned-card { background-color: #fffaf0; border-left: 6px solid #f59e0b; }
 
     .address-text { font-size: 1.05rem; font-weight: 800; color: #0f172a; line-height: 1.4; flex: 1; }
     .owner-badge {
@@ -49,7 +56,6 @@ st.markdown("""
         background-color: rgba(248, 250, 252, 0.8); padding: 12px; border-radius: 10px; 
     }
     
-    /* 네이버 지도 버튼 스타일 */
     .map-btn {
         display: block; text-align: center; background-color: #03c75a; color: white !important; 
         padding: 12px; border-radius: 10px; text-decoration: none !important; 
@@ -70,6 +76,7 @@ def load_data(file_path):
         except: return None
     return None
 
+# 타이틀 (1.0rem 반영)
 st.markdown('<p class="main-service-title">낙동강 상류 조서 조회 서비스</p>', unsafe_allow_html=True)
 
 tab1, tab2 = st.tabs(["하천구역 조회", "폐천부지 조회"])
@@ -91,7 +98,7 @@ with tab1:
             sel_dong = st.selectbox("📍 동/리 선택", options=["전체 지역"] + list(dong_list), key="river_dong")
             search_jb = st.text_input("🏠 지번 입력 (예: 1080-2)", key="river_jb")
         else:
-            st.warning(f"'{sel_reg}' 데이터 파일이 아직 업로드되지 않았습니다.")
+            st.warning(f"'{sel_reg}' 데이터 파일이 없습니다.")
 
     if df is not None:
         filtered = df.copy()
@@ -103,7 +110,7 @@ with tab1:
         for _, row in filtered.head(30).iterrows():
             full_addr = f"{row['시군']} {row['읍면']} {row['동리']} {row['번지']}"
             owner_raw = str(row['소유자_성명']).strip()
-            # [국유지 부처명 상세화]
+            # [국유지 부처명 상세화 로직]
             display_owner = str(row['소유자_주소']).strip() if owner_raw == '국' else owner_raw
             
             c_type = "national-card" if display_owner.startswith('국') else "private-card"
@@ -122,10 +129,9 @@ with tab1:
                 </div>
             """, unsafe_allow_html=True)
 
-# --- [폐천부지 조회 서비스] ---
 with tab2:
     st.markdown("""
-        <div class="property-card abandoned-card" style="text-align:center; padding:40px 20px;">
+        <div class="property-card" style="background-color:#fffaf0; border-left:6px solid #f59e0b; text-align:center; padding:40px 20px;">
             <h3 style="color:#d97706; margin-bottom:10px;">🚧 폐천부지 조회 준비 중</h3>
             <p style="color:#92400e;">폐천부지 엑셀 양식을 올려주시면 즉시 연결됩니다.</p>
         </div>
