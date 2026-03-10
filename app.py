@@ -5,7 +5,7 @@ import os
 # 1. 페이지 설정
 st.set_page_config(page_title="낙동강 상류 조서 조회 서비스", layout="wide", initial_sidebar_state="collapsed")
 
-# 2. UI/UX 디자인 (이모지 제거, 배경색 전면 적용, 필터 외부 노출 스타일)
+# 2. UI/UX 디자인 (이모지 제거, 배경색 전면 적용, 대시보드 스타일)
 st.markdown("""
     <style>
     .stApp { background-color: #f8fafc; }
@@ -16,6 +16,16 @@ st.markdown("""
     .stButton > button { width: 100%; border-radius: 8px; font-weight: 700; height: 42px; border: 1px solid #d1d5db; background-color: white; color: #374151; }
     .stButton > button:hover { border-color: #2563eb; color: #2563eb; }
 
+    /* [분리형 합계 요약] 메트릭 카드 디자인 */
+    .metric-container { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
+    .metric-card {
+        flex: 1; min-width: 160px; background-color: white; padding: 15px; border-radius: 12px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.05); border: 1px solid #e2e8f0; text-align: center;
+    }
+    .metric-label { font-size: 0.75rem; color: #64748b; margin-bottom: 5px; font-weight: 600; }
+    .metric-value { font-size: 1.1rem; font-weight: 800; color: #1e3a8a; }
+    .metric-value-red { color: #ef4444; }
+
     /* 조서 카드 디자인 */
     .property-card { padding: 18px; border-radius: 14px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); margin-bottom: 18px; border: 1px solid #e2e8f0; }
     .national-card { background-color: #f0f7ff; border-left: 6px solid #3b82f6; }
@@ -23,7 +33,6 @@ st.markdown("""
     
     .abandoned-card-보전 { background-color: #eff6ff !important; border-left: 6px solid #3b82f6; border: 1px solid #bfdbfe; }
     .abandoned-card-처분 { background-color: #fff7ed !important; border-left: 6px solid #f59e0b; border: 1px solid #fed7aa; }
-    .abandoned-card-default { background-color: #ffffff; border-left: 6px solid #e2e8f0; }
 
     .address-text { font-size: 1.05rem; font-weight: 800; color: #0f172a; line-height: 1.4; }
     .owner-badge { font-size: 0.82rem; font-weight: 700; color: #2563eb; background-color: #ffffff; padding: 3px 10px; border-radius: 8px; border: 1px solid #dbeafe; }
@@ -50,28 +59,12 @@ def get_summary(file_map, mode="river"):
                 df_clean['지적'] = pd.to_numeric(df_clean['지적'], errors='coerce').fillna(0)
                 df_clean['편입'] = pd.to_numeric(df_clean['편입'], errors='coerce').fillna(0)
                 nat_count = df[df.columns[owner_idx]].astype(str).str.strip().str.startswith('국').sum()
-                total_count = len(df_clean)
                 data_list.append({
-                    "지역명": region, "필지수": total_count, "국유지(필지)": nat_count, "사유지(필지)": total_count - nat_count,
+                    "지역명": region, "필지수": len(df_clean), "국유지(필지)": nat_count, "사유지(필지)": len(df_clean)-nat_count,
                     "지적면적(㎡)": df_clean['지적'].sum(), "편입면적(㎡)": df_clean['편입'].sum()
                 })
             except: pass
-    
-    summary_df = pd.DataFrame(data_list)
-    
-    # [요청 반영] 합계 행 추가 (표 하단에 자동 계산)
-    if not summary_df.empty:
-        total_row = pd.DataFrame([{
-            "지역명": "전체 합계",
-            "필지수": summary_df["필지수"].sum(),
-            "국유지(필지)": summary_df["국유지(필지)"].sum(),
-            "사유지(필지)": summary_df["사유지(필지)"].sum(),
-            "지적면적(㎡)": summary_df["지적면적(㎡)"].sum(),
-            "편입면적(㎡)": summary_df["편입면적(㎡)"].sum()
-        }])
-        summary_df = pd.concat([summary_df, total_row], ignore_index=True)
-        
-    return summary_df
+    return pd.DataFrame(data_list)
 
 @st.cache_data
 def load_file(path, mode="river"):
@@ -87,7 +80,7 @@ def load_file(path, mode="river"):
         return df
     except: return None
 
-# 파일 리스트
+# 파일 매핑
 river_files = { "예천군": "01_yecheon.xlsm", "구미시": "02_gumi.xlsm", "의성군": "08_uiseong.xlsm", "칠곡군": "09_chilgok.xlsm", "성주군": "11_seongju.xlsm", "고령군": "03_goryeong.xlsm", "달성군": "04_dalseong.xlsm", "문경시": "06_mungyeong.xlsm", "안동시": "07_andong.xlsm", "상주시": "10_sangju.xlsm", "달서구": "05_dalseo.xlsm" }
 delete_files = { "예천군": "01_yecheon_delete.xlsm", "구미시": "02_gumi_delete.xlsm", "의성군": "08_uiseong_delete.xlsm" }
 
@@ -105,19 +98,24 @@ with tab0:
         if st.button("폐천부지 현황"): st.session_state.summary_mode = 'delete'
     st.write("---")
     
-    if st.session_state.summary_mode == 'river':
-        st.markdown("**하천구역 지역별 요약 및 전체 합계**")
-        r_sum = get_summary(river_files, "river")
-        if not r_sum.empty:
-            # 합계 행 강조 스타일 적용
-            st.dataframe(r_sum.style.format({"필지수": "{:,}", "국유지(필지)": "{:,}", "사유지(필지)": "{:,}", "지적면적(㎡)": "{:,.0f}", "편입면적(㎡)": "{:,.0f}"}), use_container_width=True, hide_index=True)
-        else: st.info("데이터를 업로드해주세요.")
-    else:
-        st.markdown("**폐천부지 지역별 요약 및 전체 합계**")
-        d_sum = get_summary(delete_files, "delete")
-        if not d_sum.empty:
-            st.dataframe(d_sum.style.format({"필지수": "{:,}", "국유지(필지)": "{:,}", "사유지(필지)": "{:,}", "지적면적(㎡)": "{:,.0f}", "편입면적(㎡)": "{:,.0f}"}), use_container_width=True, hide_index=True)
-        else: st.info("데이터를 업로드해주세요.")
+    current_mode = st.session_state.summary_mode
+    sum_df = get_summary(river_files if current_mode == 'river' else delete_files, current_mode)
+    
+    if not sum_df.empty:
+        # [요청 반영] 전체 합계를 표 밖으로 꺼내서 '메트릭 카드'로 표현
+        st.markdown(f"**전체 합계 요약 ({'하천구역' if current_mode == 'river' else '폐천부지'})**")
+        st.markdown(f"""
+            <div class="metric-container">
+                <div class="metric-card"><div class="metric-label">필지수 합계</div><div class="metric-value">{sum_df["필지수"].sum():,}건</div></div>
+                <div class="metric-card"><div class="metric-label">국유지 합계</div><div class="metric-value">{sum_df["국유지(필지)"].sum():,}건</div></div>
+                <div class="metric-card"><div class="metric-label">사유지 합계</div><div class="metric-value">{sum_df["사유지(필지)"].sum():,}건</div></div>
+                <div class="metric-card"><div class="metric-label">편입면적 합계</div><div class="metric-value metric-value-red">{sum_df["편입면적(㎡)"].sum():,.0f}㎡</div></div>
+            </div>
+        """, unsafe_allow_html=True)
+        
+        st.markdown("**지역별 상세 요약**")
+        st.dataframe(sum_df.style.format({"필지수": "{:,}", "국유지(필지)": "{:,}", "사유지(필지)": "{:,}", "지적면적(㎡)": "{:,.0f}", "편입면적(㎡)": "{:,.0f}"}), use_container_width=True, hide_index=True)
+    else: st.info("데이터를 업로드해주세요.")
 
 # --- [Tab 1: 하천구역 조회] ---
 with tab1:
@@ -139,9 +137,10 @@ with tab1:
 
 # --- [Tab 2: 폐천부지 조회] ---
 with tab2:
+    # [요청 반영] 필터를 밖으로 꺼냄
     st.markdown('<div class="filter-box">', unsafe_allow_html=True)
+    st.write("관리계획 필터")
     f_col1, f_col2 = st.columns(2)
-    # [요청 반영] 문구 수정: 보전데이터 포함 -> 보전 / 처분 데이터 포함 -> 처분
     with f_col1: check_bojeon = st.checkbox("보전", value=True)
     with f_col2: check_cheobun = st.checkbox("처분", value=True)
     st.markdown('</div>', unsafe_allow_html=True)
