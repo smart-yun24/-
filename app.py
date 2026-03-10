@@ -12,8 +12,9 @@ st.markdown("""
     html, body { font-size: 0.98rem; }
     .main-service-title { font-size: 1.0rem !important; font-weight: 800; color: #1e3a8a; text-align: center; margin-bottom: 20px; }
     
-    /* 요약 현황 버튼 스타일 */
-    .stButton > button { width: 100%; border-radius: 8px; font-weight: 700; height: 40px; }
+    /* 요약 현황 전환 버튼 */
+    .stButton > button { width: 100%; border-radius: 8px; font-weight: 700; height: 42px; border: 1px solid #d1d5db; background-color: white; color: #374151; }
+    .stButton > button:hover { border-color: #2563eb; color: #2563eb; }
 
     /* 조서 카드 디자인 */
     .property-card { padding: 18px; border-radius: 14px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); margin-bottom: 18px; border: 1px solid #e2e8f0; }
@@ -32,12 +33,15 @@ st.markdown("""
     .info-container { display: flex; justify-content: space-between; background: rgba(255, 255, 255, 0.4); padding: 12px; border-radius: 10px; }
     
     /* 검색 팝오버 및 지도 버튼 */
-    div[data-testid="stPopover"] > button { width: 100%; height: 42px !important; font-size: 0.85rem !important; font-weight: 800 !important; background-color: #2563eb !important; color: white !important; border-radius: 10px !important; }
-    .map-btn { display: block; text-align: center; background-color: #03c75a; color: white !important; padding: 12px; border-radius: 10px; text-decoration: none !important; font-weight: 800; font-size: 0.95rem; margin-top: 15px; }
+    div[data-testid="stPopover"] > button { width: 100%; height: 45px !important; font-size: 0.85rem !important; font-weight: 800 !important; background-color: #2563eb !important; color: white !important; border-radius: 10px !important; }
+    .map-btn { display: block; text-align: center; background-color: #03c75a !important; color: white !important; padding: 12px; border-radius: 10px; text-decoration: none !important; font-weight: 800; font-size: 0.95rem; margin-top: 15px; }
+    
+    /* 체크박스 정렬 보정 */
+    .stCheckbox { margin-bottom: -10px; }
     </style>
 """, unsafe_allow_html=True)
 
-# 데이터 로딩 함수 (캐싱 적용)
+# [데이터 처리 로직]
 @st.cache_data
 def get_summary(file_map, mode="river"):
     data_list = []
@@ -45,16 +49,23 @@ def get_summary(file_map, mode="river"):
         if os.path.exists(path):
             try:
                 df = pd.read_excel(path, sheet_name=0, header=1)
-                cols = ['구역', '시군', '읍면', '동리', '번지', '지목', '지적', '편입']
-                df_clean = df.iloc[:, :len(cols)].copy()
-                df_clean.columns = cols
+                owner_idx = 9 if mode == "river" else 10
+                
+                df_clean = df.iloc[:, [1, 6, 7]].copy()
+                df_clean.columns = ['시군', '지적', '편입']
                 df_clean['지적'] = pd.to_numeric(df_clean['지적'], errors='coerce').fillna(0)
                 df_clean['편입'] = pd.to_numeric(df_clean['편입'], errors='coerce').fillna(0)
-                owner_idx = 9 if mode == "river" else 10
+                
                 nat_count = df[df.columns[owner_idx]].astype(str).str.strip().str.startswith('국').sum()
+                total_count = len(df_clean)
+                
                 data_list.append({
-                    "지역": region, "필지수": len(df_clean), "국유지": nat_count, "사유지": len(df_clean)-nat_count,
-                    "지적합계": df_clean['지적'].sum(), "편입합계": df_clean['편입'].sum()
+                    "지역명": region,
+                    "필지수": total_count,
+                    "국유지(필지)": nat_count,
+                    "사유지(필지)": total_count - nat_count,
+                    "지적면적 합계(㎡)": df_clean['지적'].sum(),
+                    "편입면적 합계(㎡)": df_clean['편입'].sum()
                 })
             except: pass
     return pd.DataFrame(data_list)
@@ -73,40 +84,44 @@ def load_file(path, mode="river"):
         return df
     except: return None
 
-# 파일 리스트 설정
-river_files = { "예천군": "01_yecheon.xlsm", "구미시": "02_gumi.xlsm", "의성군": "08_uiseong.xlsm", "칠곡군": "09_chilgok.xlsm", "성주군": "11_seongju.xlsm", "고령군": "03_goryeong.xlsm", "달성군": "04_dalseong.xlsm", "문경시": "06_mungyeong.xlsm", "안동시": "07_andong.xlsm" }
+# 파일 리스트 (현황판에 반영될 파일들)
+river_files = { "예천군": "01_yecheon.xlsm", "구미시": "02_gumi.xlsm", "의성군": "08_uiseong.xlsm", "칠곡군": "09_chilgok.xlsm", "성주군": "11_seongju.xlsm", "고령군": "03_goryeong.xlsm", "달성군": "04_dalseong.xlsm", "문경시": "06_mungyeong.xlsm", "안동시": "07_andong.xlsm", "상주시": "10_sangju.xlsm", "달서구": "05_dalseo.xlsm" }
 delete_files = { "예천군": "01_yecheon_delete.xlsm", "구미시": "02_gumi_delete.xlsm", "의성군": "08_uiseong_delete.xlsm" }
 
 st.markdown('<p class="main-service-title">낙동강 상류 조서 조회 서비스</p>', unsafe_allow_html=True)
 
 tab0, tab1, tab2 = st.tabs(["통합 요약 현황", "하천구역 조회", "폐천부지 조회"])
 
-# --- [Tab 0: 통합 요약 현황 (버튼식 전환)] ---
+# --- [Tab 0: 통합 요약 현황] ---
 with tab0:
     col_l, col_r = st.columns(2)
     if 'summary_mode' not in st.session_state:
         st.session_state.summary_mode = 'river'
     
     with col_l:
-        if st.button("하천구역 현황"):
-            st.session_state.summary_mode = 'river'
+        if st.button("하천구역 현황"): st.session_state.summary_mode = 'river'
     with col_r:
-        if st.button("폐천부지 현황"):
-            st.session_state.summary_mode = 'delete'
+        if st.button("폐천부지 현황"): st.session_state.summary_mode = 'delete'
     
     st.write("---")
     
     if st.session_state.summary_mode == 'river':
-        st.markdown("**하천구역 현황 요약**")
+        st.markdown("**하천구역 지역별 요약 현황**")
         r_sum = get_summary(river_files, "river")
         if not r_sum.empty:
-            st.dataframe(r_sum.style.format({"필지수": "{:,}", "국유지": "{:,}", "사유지": "{:,}", "지적합계": "{:,.0f}", "편입합계": "{:,.0f}"}), use_container_width=True, hide_index=True)
+            st.dataframe(r_sum.style.format({
+                "필지수": "{:,}", "국유지(필지)": "{:,}", "사유지(필지)": "{:,}",
+                "지적면적 합계(㎡)": "{:,.0f}", "편입면적 합계(㎡)": "{:,.0f}"
+            }), use_container_width=True, hide_index=True)
         else: st.info("데이터를 업로드해주세요.")
     else:
-        st.markdown("**폐천부지 현황 요약**")
+        st.markdown("**폐천부지 지역별 요약 현황**")
         d_sum = get_summary(delete_files, "delete")
         if not d_sum.empty:
-            st.dataframe(d_sum.style.format({"필지수": "{:,}", "국유지": "{:,}", "사유지": "{:,}", "지적합계": "{:,.0f}", "편입합계": "{:,.0f}"}), use_container_width=True, hide_index=True)
+            st.dataframe(d_sum.style.format({
+                "필지수": "{:,}", "국유지(필지)": "{:,}", "사유지(필지)": "{:,}",
+                "지적면적 합계(㎡)": "{:,.0f}", "편입면적 합계(㎡)": "{:,.0f}"
+            }), use_container_width=True, hide_index=True)
         else: st.info("데이터를 업로드해주세요.")
 
 # --- [Tab 1: 하천구역 조회] ---
@@ -121,27 +136,38 @@ with tab1:
         res = df.copy()
         if dong != "전체": res = res[res['동리'] == dong]
         if jb: res = res[res['번지'].astype(str).str.contains(jb)]
+        st.markdown(f"**조회된 필지: {len(res):,}건**")
         for _, row in res.head(30).iterrows():
             owner = str(row['주소']).strip() if str(row['성명']).strip() == '국' else str(row['성명']).strip()
             c_type = "national-card" if owner.startswith('국') else "private-card"
-            st.markdown(f"""<div class="property-card {c_type}"><div style="display:flex; justify-content:space-between; margin-bottom:10px;"><span class="address-text">📍 {row['시군']} {row['동리']} {row['번지']}</span><span class="owner-badge">{owner}</span></div><div class="info-container"><div><span style="font-size:0.7rem;">지적</span><br/><b>{row['지적']:,}㎡</b></div><div style="text-align:right;"><span style="font-size:0.7rem; color:red;">편입</span><br/><b>{row['편입']:,}㎡</b></div></div><a href="https://map.naver.com/v5/search/{row['시군']} {row['동리']} {row['번지']}" target="_blank" class="map-btn">지도확인(NAVER)</a></div>""", unsafe_allow_html=True)
+            st.markdown(f"""<div class="property-card {c_type}"><div style="display:flex; justify-content:space-between; margin-bottom:10px;"><span class="address-text">📍 {row['시군']} {row['동리']} {row['번지']}</span><span class="owner-badge">{owner}</span></div><div class="info-container"><div><span style="font-size:0.7rem;">지적면적</span><br/><b>{row['지적']:,}㎡</b></div><div style="text-align:right;"><span style="font-size:0.7rem; color:red;">편입면적</span><br/><b>{row['편입']:,}㎡</b></div></div><a href="https://map.naver.com/v5/search/{row['시군']} {row['동리']} {row['번지']}" target="_blank" class="map-btn">지도확인(NAVER)</a></div>""", unsafe_allow_html=True)
 
-# --- [Tab 2: 폐천부지 조회] ---
+# --- [Tab 2: 폐천부지 조회 (체크박스 필터 적용)] ---
 with tab2:
     with st.popover("폐천부지 검색"):
         sel_reg_d = st.selectbox("대상 지역 ", options=list(delete_files.keys()), key="d_reg")
         df_d = load_file(delete_files[sel_reg_d], "delete")
         if df_d is not None:
-            # 보전/처분 필터링 박스 추가
-            plan_filter = st.selectbox("관리계획 선택", options=["전체", "보전", "처분"], key="d_plan_filter")
+            # [요청 반영] 드롭다운 대신 나란히 배치된 체크박스(V)
+            st.write("관리계획 필터링")
+            c1, c2 = st.columns(2)
+            with c1: check_bojeon = st.checkbox("보전", value=True)
+            with c2: check_cheobun = st.checkbox("처분", value=True)
+            
             dong_d = st.selectbox("동/리 ", options=["전체"] + sorted(df_d['동리'].dropna().unique().tolist()), key="d_dong")
             jb_d = st.text_input("지번 입력 ", key="d_jb")
     
     if df_d is not None:
         res_d = df_d.copy()
-        # 관리계획 필터링 적용
-        if plan_filter != "전체":
-            res_d = res_d[res_d['계획'].str.contains(plan_filter, na=False)]
+        
+        # 체크박스 상태에 따른 필터링 로직
+        status_list = []
+        if check_bojeon: status_list.append("보전")
+        if check_cheobun: status_list.append("처분")
+        
+        # '계획' 컬럼에서 해당 단어가 포함된 데이터만 추출
+        res_d = res_d[res_d['계획'].apply(lambda x: any(s in str(x) for s in status_list))]
+        
         if dong_d != "전체": res_d = res_d[res_d['동리'] == dong_d]
         if jb_d: res_d = res_d[res_d['번지'].astype(str).str.contains(jb_d)]
         
@@ -150,4 +176,4 @@ with tab2:
             owner = str(row['주소']).strip() if str(row['성명']).strip() == '국' else str(row['성명']).strip()
             plan_val = str(row['계획']).strip()
             card_cls = "abandoned-card-보전" if "보전" in plan_val else "abandoned-card-처분" if "처분" in plan_val else "abandoned-card-default"
-            st.markdown(f"""<div class="property-card {card_cls}"><div style="display:flex; justify-content:space-between; margin-bottom:10px;"><span class="address-text">📍 {row['시군']} {row['동리']} {row['번지']} <span style="font-size:0.75rem; font-weight:800; border-bottom:2px solid currentColor;">({plan_val})</span></span><span class="owner-badge">{owner}</span></div><div class="info-container"><div><span style="font-size:0.7rem;">지적</span><br/><b>{row['지적']:,}㎡</b></div><div style="text-align:right;"><span style="font-size:0.7rem; color:red;">편입</span><br/><b>{row['편입']:,}㎡</b></div></div><a href="https://map.naver.com/v5/search/{row['시군']} {row['동리']} {row['번지']}" target="_blank" class="map-btn">지도확인(NAVER)</a></div>""", unsafe_allow_html=True)
+            st.markdown(f"""<div class="property-card {card_cls}"><div style="display:flex; justify-content:space-between; margin-bottom:10px;"><span class="address-text">📍 {row['시군']} {row['동리']} {row['번지']} <span style="font-size:0.75rem; font-weight:800; border-bottom:2px solid currentColor;">({plan_val})</span></span><span class="owner-badge">{owner}</span></div><div class="info-container"><div><span style="font-size:0.7rem;">지적면적</span><br/><b>{row['지적']:,}㎡</b></div><div style="text-align:right;"><span style="font-size:0.7rem; color:red;">편입면적</span><br/><b>{row['편입']:,}㎡</b></div></div><a href="https://map.naver.com/v5/search/{row['시군']} {row['동리']} {row['번지']}" target="_blank" class="map-btn">지도확인(NAVER)</a></div>""", unsafe_allow_html=True)
