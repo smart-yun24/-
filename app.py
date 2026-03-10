@@ -2,61 +2,59 @@ import streamlit as st
 import pandas as pd
 import os
 
-# 1. 페이지 설정
+# 1. 페이지 설정 및 모바일 최적화
 st.set_page_config(page_title="하천구역 스마트 조회", layout="wide", initial_sidebar_state="collapsed")
 
-# 2. 고퀄리티 모바일 UI 디자인 (지목 배경색 및 주소/소유자 통합)
+# 2. 전구간 폰트 20% 축소 및 지목별 컬러 디자인
 st.markdown("""
     <style>
     .stApp { background-color: #f8fafc; }
-    html, body { font-size: 0.9rem; }
+    html, body { font-size: 0.85rem; } /* 전체 글자 크기 축소 반영 */
     
-    .mobile-header { font-size: 1.05rem !important; font-weight: 800; color: #1e3a8a; text-align: center; margin-bottom: 15px; }
+    .mobile-header { font-size: 1.0rem !important; font-weight: 800; color: #1e3a8a; text-align: center; margin-bottom: 12px; }
     
     .property-card {
-        background-color: white; padding: 18px; border-radius: 16px; 
-        box-shadow: 0 4px 12px rgba(0,0,0,0.05); margin-bottom: 20px; border: 1px solid #e2e8f0;
+        background-color: white; padding: 14px; border-radius: 12px; 
+        box-shadow: 0 2px 8px rgba(0,0,0,0.05); margin-bottom: 15px; border: 1px solid #e2e8f0;
     }
 
-    /* 지목 뱃지 (배경색만 존재) */
+    /* 지목 뱃지 스타일 (배경색만 존재) */
     .badge {
-        display: inline-block; padding: 4px 12px; border-radius: 8px; 
-        font-size: 0.75rem; font-weight: 700; margin-bottom: 10px;
+        display: inline-block; padding: 2px 8px; border-radius: 4px; 
+        font-size: 0.7rem; font-weight: 700; margin-bottom: 6px;
     }
-    .badge-천 { background-color: #e0f2fe; color: #0369a1; } /* 하천 */
-    .badge-임 { background-color: #dcfce7; color: #15803d; } /* 임야 */
-    .badge-전, .badge-답 { background-color: #fef9c3; color: #a16207; } /* 농지 */
-    .badge-제 { background-color: #f1f5f9; color: #475569; } /* 제방 */
+    .badge-천 { background-color: #e0f2fe; color: #0369a1; } /* 하천 - 하늘색 */
+    .badge-임 { background-color: #dcfce7; color: #15803d; } /* 임야 - 초록색 */
+    .badge-전, .badge-답 { background-color: #fef9c3; color: #a16207; } /* 농지 - 노란색 */
+    .badge-제 { background-color: #f1f5f9; color: #475569; } /* 제방 - 회색 */
     .badge-default { background-color: #f3f4f6; color: #374151; }
 
-    /* 주소 및 소유자 통합 헤더 */
-    .card-header-box { margin-bottom: 12px; }
-    .address-text { font-size: 1.1rem; font-weight: 800; color: #0f172a; line-height: 1.4; display: block; }
-    .owner-tag { font-size: 0.85rem; font-weight: 600; color: #2563eb; margin-top: 4px; display: block; }
+    /* 주소 및 소유자 통합 헤더 디자인 */
+    .card-header-box { display: flex; flex-direction: column; margin-bottom: 10px; gap: 2px; }
+    .address-text { font-size: 0.95rem; font-weight: 800; color: #0f172a; line-height: 1.3; }
+    .owner-tag { font-size: 0.8rem; font-weight: 600; color: #2563eb; }
 
-    /* 지적/편입면적 정보 레이아웃 */
+    /* 면적 정보 레이아웃 */
     .info-container { 
         display: flex; justify-content: space-between; 
-        background-color: #f8fafc; padding: 12px; border-radius: 10px; margin-bottom: 15px;
+        background-color: #f8fafc; padding: 10px; border-radius: 8px; margin-bottom: 12px;
     }
-    .info-item { display: flex; flex-direction: column; }
-    .label { font-size: 0.7rem; color: #64748b; margin-bottom: 2px; }
-    .value { font-size: 1rem; font-weight: 700; color: #1e293b; }
-    .value-red { font-size: 1rem; font-weight: 700; color: #ef4444; }
+    .label { font-size: 0.65rem; color: #64748b; }
+    .value { font-size: 0.85rem; font-weight: 700; color: #1e293b; }
+    .value-red { font-size: 0.85rem; font-weight: 700; color: #ef4444; }
 
-    /* 지도 버튼 (지도 앱 실행 느낌 강조) */
-    .map-action-box {
+    /* 지도 버튼 디자인 */
+    .map-action-btn {
         display: block; text-align: center; background-color: #03c75a; color: white !important; 
-        padding: 14px; border-radius: 12px; text-decoration: none !important; 
-        font-weight: 800; font-size: 0.95rem; box-shadow: 0 4px 6px rgba(3, 199, 90, 0.2);
+        padding: 12px; border-radius: 10px; text-decoration: none !important; 
+        font-weight: 800; font-size: 0.85rem; box-shadow: 0 4px 6px rgba(3, 199, 90, 0.1);
     }
-    .map-action-box:active { transform: scale(0.98); }
     </style>
     """, unsafe_allow_html=True)
 
 st.markdown('<p class="mobile-header">🌊 하천구역 스마트 조회</p>', unsafe_allow_html=True)
 
-# 3. 데이터 로드 설정 (10개 항목 고정)
+# 3. 지자체 파일 매핑
 region_files = {
     "예천군": "01_yecheon.xlsm", "구미시": "02_gumi.xlsm", "고령군": "03_goryeong.xlsm",
     "달성군": "04_dalseong.xlsm", "달서구": "05_dalseo.xlsm", "문경시": "06_mungyeong.xlsm",
@@ -70,6 +68,7 @@ with st.popover("🔍 지역 및 지번 검색"):
     
     if os.path.exists(file_path):
         df = pd.read_excel(file_path, sheet_name=0, header=1)
+        # 10개 항목 강제 매핑
         df.columns = ['구역', '시군', '읍면', '동리', '번지', '지목', '지적_m2', '편입면적_m2', '소유자_주소', '소유자_성명']
         
         dong_list = sorted(df['동리'].dropna().unique())
@@ -86,37 +85,38 @@ if target_dong != "전체 지역":
 if search_jibun:
     filtered_df = filtered_df[filtered_df['번지'].astype(str).str.contains(search_jibun)]
 
-st.markdown(f"**총 {len(filtered_df):,}건 조회됨**")
+st.markdown(f"**총 {len(filtered_df):,}건**")
 
 for _, row in filtered_df.head(50).iterrows():
-    # 요청대로 풀 주소 생성
+    # 요청대로 시군/읍면 포함한 풀 주소 생성
     full_addr = f"{row['시군']} {row['읍면']} {row['동리']} {row['번지']}"
     
-    # 지목별 클래스 (배경색만)
+    # 지목별 클래스 결정 (배경색 전용)
     jimok = str(row['지목'])
     badge_class = f"badge-{jimok}" if jimok in ['천', '임', '전', '답', '제'] else "badge-default"
     
+    # [핵심] st.markdown 안에 unsafe_allow_html=True가 반드시 있어야 함
     st.markdown(f"""
         <div class="property-card">
-            <span class="{badge_class}">{jimok}</span>
+            <span class="badge {badge_class}">{jimok}</span>
             <div class="card-header-box">
                 <span class="address-text">📍 {full_addr}</span>
                 <span class="owner-tag">👤 소유자: {row['소유자_성명']}</span>
             </div>
             
             <div class="info-container">
-                <div class="info-item">
-                    <span class="label">지적면적</span>
+                <div>
+                    <span class="label">지적면적</span><br/>
                     <span class="value">{row['지적_m2']:,}㎡</span>
                 </div>
-                <div class="info-item" style="text-align:right;">
-                    <span class="label" style="color:#ef4444;">편입면적</span>
+                <div style="text-align:right;">
+                    <span class="label" style="color:#ef4444;">편입면적</span><br/>
                     <span class="value-red">{row['편입면적_m2']:,}㎡</span>
                 </div>
             </div>
             
-            <a href="https://map.naver.com/v5/search/{full_addr}" target="_blank" class="map-action-box">
-                🗺️ 네이버 지도로 위치 확인하기
+            <a href="https://map.naver.com/v5/search/{full_addr}" target="_blank" class="map-action-btn">
+                🗺️ 지도 위치 확인
             </a>
         </div>
     """, unsafe_allow_html=True)
