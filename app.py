@@ -18,13 +18,13 @@ st.markdown("""
     /* 조서 카드 디자인 */
     .property-card { padding: 18px; border-radius: 14px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); margin-bottom: 18px; border: 1px solid #e2e8f0; }
     
-    /* 하천구역 카드 */
+    /* 하천구역 카드 (기본) */
     .national-card { background-color: #f0f7ff; border-left: 6px solid #3b82f6; }
     .private-card { background-color: #ffffff; border-left: 6px solid #e2e8f0; }
     
-    /* [요청 반영] 폐천부지 카드 배경색 전체 적용 */
-    .abandoned-card-보전 { background-color: #eff6ff !important; border-left: 6px solid #3b82f6; border: 1px solid #bfdbfe; } /* 전체 블루 배경 */
-    .abandoned-card-처분 { background-color: #fff7ed !important; border-left: 6px solid #f59e0b; border: 1px solid #fed7aa; } /* 전체 오렌지 배경 */
+    /* [요청 반영] 폐천부지 카드 배경색 전체 적용 (보전=블루, 처분=오렌지) */
+    .abandoned-card-보전 { background-color: #eff6ff !important; border-left: 6px solid #3b82f6; border: 1px solid #bfdbfe; }
+    .abandoned-card-처분 { background-color: #fff7ed !important; border-left: 6px solid #f59e0b; border: 1px solid #fed7aa; }
     .abandoned-card-default { background-color: #ffffff; border-left: 6px solid #e2e8f0; }
 
     .address-text { font-size: 1.05rem; font-weight: 800; color: #0f172a; line-height: 1.4; }
@@ -74,25 +74,24 @@ def load_file(path, mode="river"):
     except: return None
 
 # 파일 리스트 설정
-river_files = { "예천군": "01_yecheon.xlsm", "구미시": "02_gumi.xlsm", "의성군": "08_uiseong.xlsm", "칠곡군": "09_chilgok.xlsm", "성주군": "11_seongju.xlsm", "고령군": "03_goryeong.xlsm", "달성군": "04_dalseong.xlsm", "문경시": "06_mungyeong.xlsm", "안동시": "07_andong.xlsm", "상주시": "10_sangju.xlsm", "달서구": "05_dalseo.xlsm" }
+river_files = { "예천군": "01_yecheon.xlsm", "구미시": "02_gumi.xlsm", "의성군": "08_uiseong.xlsm", "칠곡군": "09_chilgok.xlsm", "성주군": "11_seongju.xlsm", "고령군": "03_goryeong.xlsm", "달성군": "04_dalseong.xlsm", "문경시": "06_mungyeong.xlsm", "안동시": "07_andong.xlson", "상주시": "10_sangju.xlsm", "달서구": "05_dalseo.xlsm" }
 delete_files = { "예천군": "01_yecheon_delete.xlsm", "구미시": "02_gumi_delete.xlsm", "의성군": "08_uiseong_delete.xlsm" }
 
 st.markdown('<p class="main-service-title">낙동강 상류 조서 조회 서비스</p>', unsafe_allow_html=True)
 
-tab0, tab1, tab2 = st.tabs(["📊 통합 요약 현황", "하천구역 조회", "폐천부지 조회"])
+tab0, tab1, tab2 = st.tabs(["통합 요약 현황", "하천구역 조회", "폐천부지 조회"])
 
 # --- [Tab 0: 통합 요약 현황 (버튼식 전환)] ---
 with tab0:
     col_l, col_r = st.columns(2)
-    # 세션 상태를 이용한 화면 전환
     if 'summary_mode' not in st.session_state:
         st.session_state.summary_mode = 'river'
     
     with col_l:
-        if st.button("🌊 하천구역 현황"):
+        if st.button("하천구역 현황"):
             st.session_state.summary_mode = 'river'
     with col_r:
-        if st.button("🍂 폐천부지 현황"):
+        if st.button("폐천부지 현황"):
             st.session_state.summary_mode = 'delete'
     
     st.write("---")
@@ -112,12 +111,12 @@ with tab0:
 
 # --- [Tab 1: 하천구역 조회] ---
 with tab1:
-    with st.popover("🔍 지역 및 지번 검색"):
-        sel_reg = st.selectbox("🎯 지역", options=list(river_files.keys()), key="r_reg")
+    with st.popover("지역 및 지번 검색"):
+        sel_reg = st.selectbox("대상 지역", options=list(river_files.keys()), key="r_reg")
         df = load_file(river_files[sel_reg], "river")
         if df is not None:
-            dong = st.selectbox("📍 동/리", options=["전체"] + sorted(df['동리'].dropna().unique().tolist()), key="r_dong")
-            jb = st.text_input("🏠 지번", key="r_jb")
+            dong = st.selectbox("동/리", options=["전체"] + sorted(df['동리'].dropna().unique().tolist()), key="r_dong")
+            jb = st.text_input("지번 입력", key="r_jb")
     if df is not None:
         res = df.copy()
         if dong != "전체": res = res[res['동리'] == dong]
@@ -125,23 +124,26 @@ with tab1:
         for _, row in res.head(30).iterrows():
             owner = str(row['주소']).strip() if str(row['성명']).strip() == '국' else str(row['성명']).strip()
             c_type = "national-card" if owner.startswith('국') else "private-card"
-            st.markdown(f"""<div class="property-card {c_type}"><div style="display:flex; justify-content:space-between; margin-bottom:10px;"><span class="address-text">📍 {row['시군']} {row['동리']} {row['번지']}</span><span class="owner-badge">{owner}</span></div><div class="info-container"><div><span style="font-size:0.7rem;">지적</span><br/><b>{row['지적']:,}㎡</b></div><div style="text-align:right;"><span style="font-size:0.7rem; color:red;">편입</span><br/><b>{row['편입']:,}㎡</b></div></div><a href="https://map.naver.com/v5/search/{row['시군']} {row['동리']} {row['번지']}" target="_blank" class="map-btn">🗺️ 지도확인(NAVER)</a></div>""", unsafe_allow_html=True)
+            st.markdown(f"""<div class="property-card {c_type}"><div style="display:flex; justify-content:space-between; margin-bottom:10px;"><span class="address-text">📍 {row['시군']} {row['동리']} {row['번지']}</span><span class="owner-badge">{owner}</span></div><div class="info-container"><div><span style="font-size:0.7rem;">지적</span><br/><b>{row['지적']:,}㎡</b></div><div style="text-align:right;"><span style="font-size:0.7rem; color:red;">편입</span><br/><b>{row['편입']:,}㎡</b></div></div><a href="https://map.naver.com/v5/search/{row['시군']} {row['동리']} {row['번지']}" target="_blank" class="map-btn">지도확인(NAVER)</a></div>""", unsafe_allow_html=True)
 
-# --- [Tab 2: 폐천부지 조회 (카드 배경색 전체 반영)] ---
+# --- [Tab 2: 폐천부지 조회 (처분/보전 필터 및 배경색 적용)] ---
 with tab2:
-    with st.popover("🔍 폐천부지 검색"):
-        sel_reg_d = st.selectbox("🎯 지역 ", options=list(delete_files.keys()), key="d_reg")
+    with st.popover("폐천부지 검색"):
+        sel_reg_d = st.selectbox("대상 지역 ", options=list(delete_files.keys()), key="d_reg")
         df_d = load_file(delete_files[sel_reg_d], "delete")
         if df_d is not None:
-            dong_d = st.selectbox("📍 동/리 ", options=["전체"] + sorted(df_d['동리'].dropna().unique().tolist()), key="d_dong")
-            jb_d = st.text_input("🏠 지번 ", key="d_jb")
+            # [요청 반영] 처분/보전 필터 추가
+            plan_filter = st.selectbox("관리계획 선택", options=["전체", "보전", "처분"], key="d_plan_filter")
+            dong_d = st.selectbox("동/리 ", options=["전체"] + sorted(df_d['동리'].dropna().unique().tolist()), key="d_dong")
+            jb_d = st.text_input("지번 입력 ", key="d_jb")
     if df_d is not None:
         res_d = df_d.copy()
+        if plan_filter != "전체": res_d = res_d[res_d['계획'].str.contains(plan_filter, na=False)]
         if dong_d != "전체": res_d = res_d[res_d['동리'] == dong_d]
         if jb_d: res_d = res_d[res_d['번지'].astype(str).str.contains(jb_d)]
         for _, row in res_d.head(30).iterrows():
             owner = str(row['주소']).strip() if str(row['성명']).strip() == '국' else str(row['성명']).strip()
             plan_val = str(row['계획']).strip()
-            # [요청 반영] 배경색 클래스 할당
+            # [요청 반영] 배경색 전체 적용 클래스
             card_cls = "abandoned-card-보전" if "보전" in plan_val else "abandoned-card-처분" if "처분" in plan_val else "abandoned-card-default"
-            st.markdown(f"""<div class="property-card {card_cls}"><div style="display:flex; justify-content:space-between; margin-bottom:10px;"><span class="address-text">📍 {row['시군']} {row['동리']} {row['번지']} <span style="font-size:0.75rem; font-weight:800; border-bottom:2px solid currentColor;">({plan_val})</span></span><span class="owner-badge">{owner}</span></div><div class="info-container"><div><span style="font-size:0.7rem;">지적</span><br/><b>{row['지적']:,}㎡</b></div><div style="text-align:right;"><span style="font-size:0.7rem; color:red;">편입</span><br/><b>{row['편입']:,}㎡</b></div></div><a href="https://map.naver.com/v5/search/{row['시군']} {row['동리']} {row['번지']}" target="_blank" class="map-btn">🗺️ 지도확인(NAVER)</a></div>""", unsafe_allow_html=True)
+            st.markdown(f"""<div class="property-card {card_cls}"><div style="display:flex; justify-content:space-between; margin-bottom:10px;"><span class="address-text">📍 {row['시군']} {row['동리']} {row['번지']} <span style="font-size:0.75rem; font-weight:800; border-bottom:2px solid currentColor;">({plan_val})</span></span><span class="owner-badge">{owner}</span></div><div class="info-container"><div><span style="font-size:0.7rem;">지적</span><br/><b>{row['지적']:,}㎡</b></div><div style="text-align:right;"><span style="font-size:0.7rem; color:red;">편입</span><br/><b>{row['편입']:,}㎡</b></div></div><a href="https://map.naver.com/v5/search/{row['시군']} {row['동리']} {row['번지']}" target="_blank" class="map-btn">지도확인(NAVER)</a></div>""", unsafe_allow_html=True)
