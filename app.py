@@ -18,12 +18,9 @@ st.markdown("""
 
     /* 조서 카드 디자인 */
     .property-card { padding: 18px; border-radius: 14px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); margin-bottom: 18px; border: 1px solid #e2e8f0; }
-    
-    /* 하천구역 카드 */
     .national-card { background-color: #f0f7ff; border-left: 6px solid #3b82f6; }
     .private-card { background-color: #ffffff; border-left: 6px solid #e2e8f0; }
     
-    /* 폐천부지 카드 배경색 전체 적용 (보전=블루, 처분=오렌지) */
     .abandoned-card-보전 { background-color: #eff6ff !important; border-left: 6px solid #3b82f6; border: 1px solid #bfdbfe; }
     .abandoned-card-처분 { background-color: #fff7ed !important; border-left: 6px solid #f59e0b; border: 1px solid #fed7aa; }
     .abandoned-card-default { background-color: #ffffff; border-left: 6px solid #e2e8f0; }
@@ -32,11 +29,9 @@ st.markdown("""
     .owner-badge { font-size: 0.82rem; font-weight: 700; color: #2563eb; background-color: #ffffff; padding: 3px 10px; border-radius: 8px; border: 1px solid #dbeafe; }
     .info-container { display: flex; justify-content: space-between; background: rgba(255, 255, 255, 0.4); padding: 12px; border-radius: 10px; }
     
-    /* 검색 팝오버 및 지도 버튼 */
     div[data-testid="stPopover"] > button { width: 100%; height: 45px !important; font-size: 0.85rem !important; font-weight: 800 !important; background-color: #2563eb !important; color: white !important; border-radius: 10px !important; }
     .map-btn { display: block; text-align: center; background-color: #03c75a !important; color: white !important; padding: 12px; border-radius: 10px; text-decoration: none !important; font-weight: 800; font-size: 0.95rem; margin-top: 15px; }
     
-    /* 외부 체크박스 영역 스타일 */
     .filter-box { background-color: #ffffff; padding: 10px 15px; border-radius: 10px; border: 1px solid #e2e8f0; margin-bottom: 15px; }
     </style>
 """, unsafe_allow_html=True)
@@ -58,10 +53,25 @@ def get_summary(file_map, mode="river"):
                 total_count = len(df_clean)
                 data_list.append({
                     "지역명": region, "필지수": total_count, "국유지(필지)": nat_count, "사유지(필지)": total_count - nat_count,
-                    "지적면적 합계(㎡)": df_clean['지적'].sum(), "편입면적 합계(㎡)": df_clean['편입'].sum()
+                    "지적면적(㎡)": df_clean['지적'].sum(), "편입면적(㎡)": df_clean['편입'].sum()
                 })
             except: pass
-    return pd.DataFrame(data_list)
+    
+    summary_df = pd.DataFrame(data_list)
+    
+    # [요청 반영] 합계 행 추가 (표 하단에 자동 계산)
+    if not summary_df.empty:
+        total_row = pd.DataFrame([{
+            "지역명": "전체 합계",
+            "필지수": summary_df["필지수"].sum(),
+            "국유지(필지)": summary_df["국유지(필지)"].sum(),
+            "사유지(필지)": summary_df["사유지(필지)"].sum(),
+            "지적면적(㎡)": summary_df["지적면적(㎡)"].sum(),
+            "편입면적(㎡)": summary_df["편입면적(㎡)"].sum()
+        }])
+        summary_df = pd.concat([summary_df, total_row], ignore_index=True)
+        
+    return summary_df
 
 @st.cache_data
 def load_file(path, mode="river"):
@@ -94,17 +104,19 @@ with tab0:
     with col_r:
         if st.button("폐천부지 현황"): st.session_state.summary_mode = 'delete'
     st.write("---")
+    
     if st.session_state.summary_mode == 'river':
-        st.markdown("**하천구역 지역별 요약 현황**")
+        st.markdown("**하천구역 지역별 요약 및 전체 합계**")
         r_sum = get_summary(river_files, "river")
         if not r_sum.empty:
-            st.dataframe(r_sum.style.format({"필지수": "{:,}", "국유지(필지)": "{:,}", "사유지(필지)": "{:,}", "지적면적 합계(㎡)": "{:,.0f}", "편입면적 합계(㎡)": "{:,.0f}"}), use_container_width=True, hide_index=True)
+            # 합계 행 강조 스타일 적용
+            st.dataframe(r_sum.style.format({"필지수": "{:,}", "국유지(필지)": "{:,}", "사유지(필지)": "{:,}", "지적면적(㎡)": "{:,.0f}", "편입면적(㎡)": "{:,.0f}"}), use_container_width=True, hide_index=True)
         else: st.info("데이터를 업로드해주세요.")
     else:
-        st.markdown("**폐천부지 지역별 요약 현황**")
+        st.markdown("**폐천부지 지역별 요약 및 전체 합계**")
         d_sum = get_summary(delete_files, "delete")
         if not d_sum.empty:
-            st.dataframe(d_sum.style.format({"필지수": "{:,}", "국유지(필지)": "{:,}", "사유지(필지)": "{:,}", "지적면적 합계(㎡)": "{:,.0f}", "편입면적 합계(㎡)": "{:,.0f}"}), use_container_width=True, hide_index=True)
+            st.dataframe(d_sum.style.format({"필지수": "{:,}", "국유지(필지)": "{:,}", "사유지(필지)": "{:,}", "지적면적(㎡)": "{:,.0f}", "편입면적(㎡)": "{:,.0f}"}), use_container_width=True, hide_index=True)
         else: st.info("데이터를 업로드해주세요.")
 
 # --- [Tab 1: 하천구역 조회] ---
@@ -125,13 +137,13 @@ with tab1:
             c_type = "national-card" if owner.startswith('국') else "private-card"
             st.markdown(f"""<div class="property-card {c_type}"><div style="display:flex; justify-content:space-between; margin-bottom:10px;"><span class="address-text">📍 {row['시군']} {row['동리']} {row['번지']}</span><span class="owner-badge">{owner}</span></div><div class="info-container"><div><span style="font-size:0.7rem;">지적면적</span><br/><b>{row['지적']:,}㎡</b></div><div style="text-align:right;"><span style="font-size:0.7rem; color:red;">편입면적</span><br/><b>{row['편입']:,}㎡</b></div></div><a href="https://map.naver.com/v5/search/{row['시군']} {row['동리']} {row['번지']}" target="_blank" class="map-btn">지도확인(NAVER)</a></div>""", unsafe_allow_html=True)
 
-# --- [Tab 2: 폐천부지 조회 (체크박스 외부 노출)] ---
+# --- [Tab 2: 폐천부지 조회] ---
 with tab2:
-    # [요청 반영] 체크박스를 밖으로 뺐습니다.
     st.markdown('<div class="filter-box">', unsafe_allow_html=True)
     f_col1, f_col2 = st.columns(2)
-    with f_col1: check_bojeon = st.checkbox("보전 데이터 포함", value=True)
-    with f_col2: check_cheobun = st.checkbox("처분 데이터 포함", value=True)
+    # [요청 반영] 문구 수정: 보전데이터 포함 -> 보전 / 처분 데이터 포함 -> 처분
+    with f_col1: check_bojeon = st.checkbox("보전", value=True)
+    with f_col2: check_cheobun = st.checkbox("처분", value=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
     with st.popover("지역 및 지번 상세 검색"):
@@ -143,7 +155,6 @@ with tab2:
     
     if df_d is not None:
         res_d = df_d.copy()
-        # 필터링 로직
         status_list = []
         if check_bojeon: status_list.append("보전")
         if check_cheobun: status_list.append("처분")
