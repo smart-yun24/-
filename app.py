@@ -184,14 +184,24 @@ def display_cards(res_df, mode="river"):
         full_addr = f"{row['시군']} {row['읍면']} {row['동리']} {row['번지']}".replace('nan', '').strip()
         encoded_addr = urllib.parse.quote(full_addr)
         
-        # 성명이 '국'일 때는 주소를 뱃지에 띄우도록 한 로직 (원래 사양 유지)
+        # 성명이 '국'일 때는 주소를 뱃지에 띄우도록 한 로직
         owner = str(row['성명']).strip() if str(row['성명']).strip() != '국' else str(row['주소']).strip()
         
         if mode == "delete":
             p_val = str(row['계획']).strip()
             card_cls = f"abandoned-card-{p_val}" if p_val in ["보전", "처분"] else "property-card"
             plan_label = f'<span style="font-size:0.75rem; font-weight:800; border-bottom:2px solid currentColor;">({p_val})</span>'
-        else: # river or flood
+            
+        elif mode == "flood":
+            card_cls = "national-card" if str(row['성명']).strip() == '국' else "private-card"
+            zone_val = str(row['구역']).strip()
+            # 구역 번호가 있으면 예쁜 파란색 뱃지 형태로 출력
+            if zone_val and zone_val != 'nan':
+                plan_label = f'<span style="font-size:0.75rem; font-weight:800; color:#0284c7; background-color:#e0f2fe; padding:3px 8px; border-radius:6px; margin-left:8px;">{zone_val}</span>'
+            else:
+                plan_label = ""
+                
+        else: # river
             card_cls = "national-card" if str(row['성명']).strip() == '국' else "private-card"
             plan_label = ""
 
