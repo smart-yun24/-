@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import os
 import urllib.parse
+import plotly.express as px  # 그래프를 그리기 위한 라이브러리 추가!
 
 # 1. 페이지 설정 (브라우저 탭 이름 및 레이아웃)
 st.set_page_config(page_title="낙동강 상류 조서 조회 서비스", layout="wide", initial_sidebar_state="collapsed")
@@ -174,6 +175,34 @@ with tab0:
                 <div class="metric-card"><div class="metric-label">편입면적 합계</div><div class="metric-value metric-value-red">{sum_df["편입면적(㎡)"].sum():,.0f}㎡</div></div>
             </div>
         """, unsafe_allow_html=True)
+        
+        # --- [신규 추가: 도넛 차트 그래프] ---
+        st.markdown(f"**📊 {mode_name} 지역별 편입면적 점유율**")
+        
+        # 면적이 0인 데이터는 그래프에서 제외 (깔끔하게 보이기 위함)
+        chart_df = sum_df[sum_df["편입면적(㎡)"] > 0]
+        
+        fig = px.pie(
+            chart_df,
+            values="편입면적(㎡)",
+            names="지역명",
+            hole=0.45, # 도넛 모양 두께 설정
+            color_discrete_sequence=px.colors.sequential.Blues_r # 유신 테마에 어울리는 푸른계열
+        )
+        fig.update_traces(
+            textposition='inside',
+            textinfo='percent+label',
+            hovertemplate="<b>%{label}</b><br>편입면적: %{value:,.0f} ㎡<extra></extra>",
+            marker=dict(line=dict(color='#ffffff', width=2)) # 조각 사이를 흰 선으로 구분해서 세련되게
+        )
+        fig.update_layout(
+            margin=dict(t=10, b=10, l=10, r=10),
+            showlegend=True,
+            legend=dict(orientation="h", yanchor="bottom", y=-0.2, xanchor="center", x=0.5) # 범례를 아래쪽에 가로로 배치
+        )
+        st.plotly_chart(fig, use_container_width=True)
+        # ------------------------------------
+
         st.markdown("**지역별 상세 현황표**")
         st.dataframe(sum_df.style.format({"필지수": "{:,}", "국유지(필지)": "{:,}", "사유지(필지)": "{:,}", "지적면적(㎡)": "{:,.0f}", "편입면적(㎡)": "{:,.0f}"}), use_container_width=True, hide_index=True)
     else: st.info(f"{mode_name} 데이터 파일이 존재하지 않습니다.")
@@ -195,99 +224,3 @@ def display_cards(res_df, mode="river"):
         elif mode == "flood":
             card_cls = "national-card" if str(row['성명']).strip() == '국' else "private-card"
             zone_val = str(row.get('홍수구역', '')).strip()
-            # I열에서 뽑아온 구역 번호가 있으면 파란색 뱃지 생성
-            if zone_val and zone_val not in ['nan', 'None', '']:
-                plan_label = f'<span style="font-size:0.75rem; font-weight:800; color:#0284c7; background-color:#e0f2fe; padding:3px 8px; border-radius:6px; margin-left:8px;">{zone_val}</span>'
-            else:
-                plan_label = ""
-                
-        else: # river
-            card_cls = "national-card" if str(row['성명']).strip() == '국' else "private-card"
-            plan_label = ""
-
-        st.markdown(f"""
-            <div class="property-card {card_cls}">
-                <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
-                    <span class="address-text">📍 {full_addr} {plan_label}</span>
-                    <span class="owner-badge">{owner}</span>
-                </div>
-                <div class="info-container">
-                    <div><span style="font-size:0.75rem; color:#64748b;">지적면적</span><br/><b>{row['지적']:,}㎡</b></div>
-                    <div style="text-align:right;"><span style="font-size:0.75rem; color:#dc2626;">편입면적</span><br/><b style="color:#dc2626;">{row['편입']:,}㎡</b></div>
-                </div>
-                <a href="https://map.naver.com/v5/search/{encoded_addr}" target="_blank" class="map-btn">지도확인(NAVER)</a>
-            </div>
-        """, unsafe_allow_html=True)
-
-# --- [Tab 1: 하천구역 조회] ---
-with tab1:
-    with st.popover("지역 및 지번 검색"):
-        sel_reg = st.selectbox("대상 지역", options=list(river_files.keys()), key="r_reg")
-        df = load_file(river_files[sel_reg], "river")
-        if df is not None:
-            dong = st.selectbox("동/리", options=["전체"] + sorted(df['동리'].dropna().unique().tolist()), key="r_dong")
-            jb = st.text_input("지번 입력", key="r_jb")
-    if df is not None:
-        res = df.copy()
-        if dong != "전체": res = res[res['동리'] == dong]
-        if jb: res = res[res['번지'].astype(str).str.contains(jb)]
-        st.markdown(f"**조회 필지: {len(res):,}건**")
-        display_cards(res, "river")
-
-# --- [Tab 2: 폐천부지 조회] ---
-with tab2:
-    st.markdown('<div class="filter-box">**관리계획 필터**', unsafe_allow_html=True)
-    c1, c2 = st.columns(2)
-    with c1: check_bojeon = st.checkbox("보전", value=True)
-    with c2: check_cheobun = st.checkbox("처분", value=True)
-    st.markdown('</div>', unsafe_allow_html=True)
-
-    with st.popover("상세 지역 검색"):
-        df_d_all = load_file(DELETE_ALL_FILE, "delete")
-        
-        if df_d_all is not None and not df_d_all.empty:
-            regions = sorted(df_d_all['시군'].dropna().unique().tolist())
-            sel_reg_d = st.selectbox("대상 지역 ", options=regions, key="d_reg")
-            df_d = df_d_all[df_d_all['시군'] == sel_reg_d]
-            dong_d = st.selectbox("동/리 ", options=["전체"] + sorted(df_d['동리'].dropna().unique().tolist()), key="d_dong")
-            jb_d = st.text_input("지번 입력 ", key="d_jb")
-        else:
-            df_d = None
-    
-    if df_d is not None:
-        res_d = df_d.copy()
-        
-        status_list = []
-        if check_bojeon: status_list.append("보전")
-        if check_cheobun: status_list.append("처분")
-        res_d = res_d[res_d['계획'].apply(lambda x: any(s in str(x) for s in status_list))]
-        
-        if dong_d != "전체": res_d = res_d[res_d['동리'] == dong_d]
-        if jb_d: res_d = res_d[res_d['번지'].astype(str).str.contains(jb_d)]
-        
-        st.markdown(f"**조회 필지: {len(res_d):,}건**")
-        display_cards(res_d, "delete")
-
-# --- [Tab 3: 홍수관리구역 조회 (신규)] ---
-with tab3:
-    with st.popover("상세 지역 검색"):
-        df_f_all = load_file(FLOOD_ALL_FILE, "flood")
-        
-        if df_f_all is not None and not df_f_all.empty:
-            regions_f = sorted(df_f_all['시군'].dropna().unique().tolist())
-            sel_reg_f = st.selectbox("대상 지역", options=regions_f, key="f_reg")
-            
-            df_f = df_f_all[df_f_all['시군'] == sel_reg_f]
-            dong_f = st.selectbox("동/리", options=["전체"] + sorted(df_f['동리'].dropna().unique().tolist()), key="f_dong")
-            jb_f = st.text_input("지번 입력", key="f_jb")
-        else:
-            df_f = None
-    
-    if df_f is not None:
-        res_f = df_f.copy()
-        
-        if dong_f != "전체": res_f = res_f[res_f['동리'] == dong_f]
-        if jb_f: res_f = res_f[res_f['번지'].astype(str).str.contains(jb_f)]
-        
-        st.markdown(f"**조회 필지: {len(res_f):,}건**")
-        display_cards(res_f, "flood")
