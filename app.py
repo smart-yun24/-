@@ -110,10 +110,15 @@ def load_file(path, mode="river"):
         df_raw = pd.read_excel(path, sheet_name=0, header=1)
         # 컬럼 구조 정의 (시군, 읍면, 동리, 번지 포함)
         cols = ['구역', '시군', '읍면', '동리', '번지', '지목', '지적', '편입']
+        
         if mode == "delete":
             df = df_raw.iloc[:, :11].copy()
             df.columns = cols + ['계획', '주소', '성명']
-        else: # river, flood
+        elif mode == "flood":
+            # 홍수관리구역은 중간 열(비고 등)이 있을 수 있으므로, 앞의 8개 열 + 맨 끝 2개(주소,성명)를 강제 추출
+            df = df_raw.iloc[:, [0, 1, 2, 3, 4, 5, 6, 7, -2, -1]].copy()
+            df.columns = cols + ['주소', '성명']
+        else: # river
             df = df_raw.iloc[:, :10].copy()
             df.columns = cols + ['주소', '성명']
         
@@ -178,6 +183,8 @@ def display_cards(res_df, mode="river"):
     for _, row in res_df.head(30).iterrows():
         full_addr = f"{row['시군']} {row['읍면']} {row['동리']} {row['번지']}".replace('nan', '').strip()
         encoded_addr = urllib.parse.quote(full_addr)
+        
+        # 성명이 '국'일 때는 주소를 뱃지에 띄우도록 한 로직 (원래 사양 유지)
         owner = str(row['성명']).strip() if str(row['성명']).strip() != '국' else str(row['주소']).strip()
         
         if mode == "delete":
@@ -254,15 +261,12 @@ with tab2:
 # --- [Tab 3: 홍수관리구역 조회 (신규)] ---
 with tab3:
     with st.popover("상세 지역 검색"):
-        # 단일 파일 로드
         df_f_all = load_file(FLOOD_ALL_FILE, "flood")
         
         if df_f_all is not None and not df_f_all.empty:
-            # 엑셀 데이터 안의 '시군' 컬럼을 추출해서 자동으로 셀렉트박스 목록 생성
             regions_f = sorted(df_f_all['시군'].dropna().unique().tolist())
             sel_reg_f = st.selectbox("대상 지역", options=regions_f, key="f_reg")
             
-            # 선택된 지역으로 미리 필터링
             df_f = df_f_all[df_f_all['시군'] == sel_reg_f]
             dong_f = st.selectbox("동/리", options=["전체"] + sorted(df_f['동리'].dropna().unique().tolist()), key="f_dong")
             jb_f = st.text_input("지번 입력", key="f_jb")
