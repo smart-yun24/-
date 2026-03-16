@@ -170,7 +170,7 @@ with tab0:
             </div>
         """, unsafe_allow_html=True)
         
-        # 도넛 차트
+        # --- [수정됨: 구분이 확 되는 다채로운 색상표 적용] ---
         st.markdown(f"**📊 {mode_name} 지역별 편입면적 점유율**")
         chart_df = sum_df[sum_df["편입면적(㎡)"] > 0]
         
@@ -179,7 +179,7 @@ with tab0:
             values="편입면적(㎡)",
             names="지역명",
             hole=0.45, 
-            color_discrete_sequence=px.colors.sequential.Blues_r 
+            color_discrete_sequence=px.colors.qualitative.Set2 # 파란색 그라데이션에서 확 구분되는 파스텔톤 컬러셋으로 변경!
         )
         fig.update_traces(
             textposition='inside',
@@ -193,6 +193,7 @@ with tab0:
             legend=dict(orientation="h", yanchor="bottom", y=-0.2, xanchor="center", x=0.5)
         )
         st.plotly_chart(fig, use_container_width=True)
+        # --------------------------------------------------
 
         st.markdown("**지역별 상세 현황표**")
         st.dataframe(sum_df.style.format({"필지수": "{:,}", "국유지(필지)": "{:,}", "사유지(필지)": "{:,}", "지적면적(㎡)": "{:,.0f}", "편입면적(㎡)": "{:,.0f}"}), use_container_width=True, hide_index=True)
@@ -214,7 +215,6 @@ def display_cards(res_df, mode="river"):
         elif mode == "flood":
             card_cls = "national-card" if str(row['성명']).strip() == '국' else "private-card"
             zone_val = str(row.get('홍수구역', '')).strip()
-            # 아까 여기서 짤렸었어! 이제 완벽하게 끝맺음!
             if zone_val and zone_val not in ['nan', 'None', '']:
                 plan_label = f'<span style="font-size:0.75rem; font-weight:800; color:#0284c7; background-color:#e0f2fe; padding:3px 8px; border-radius:6px; margin-left:8px;">{zone_val}</span>'
             else:
