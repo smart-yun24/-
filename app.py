@@ -115,9 +115,9 @@ def load_file(path, mode="river"):
             df = df_raw.iloc[:, :11].copy()
             df.columns = cols + ['계획', '주소', '성명']
         elif mode == "flood":
-            # 홍수관리구역은 중간 열(비고 등)이 있을 수 있으므로, 앞의 8개 열 + 맨 끝 2개(주소,성명)를 강제 추출
-            df = df_raw.iloc[:, [0, 1, 2, 3, 4, 5, 6, 7, -2, -1]].copy()
-            df.columns = cols + ['주소', '성명']
+            # I열(인덱스 8)을 '홍수구역'으로 가져옴, 뒤에서 2번째는 주소, 마지막은 성명
+            df = df_raw.iloc[:, [0, 1, 2, 3, 4, 5, 6, 7, 8, -2, -1]].copy()
+            df.columns = cols + ['홍수구역', '주소', '성명']
         else: # river
             df = df_raw.iloc[:, :10].copy()
             df.columns = cols + ['주소', '성명']
@@ -194,9 +194,9 @@ def display_cards(res_df, mode="river"):
             
         elif mode == "flood":
             card_cls = "national-card" if str(row['성명']).strip() == '국' else "private-card"
-            zone_val = str(row['구역']).strip()
-            # 구역 번호가 있으면 예쁜 파란색 뱃지 형태로 출력
-            if zone_val and zone_val != 'nan':
+            zone_val = str(row.get('홍수구역', '')).strip()
+            # I열에서 뽑아온 구역 번호가 있으면 파란색 뱃지 생성
+            if zone_val and zone_val not in ['nan', 'None', '']:
                 plan_label = f'<span style="font-size:0.75rem; font-weight:800; color:#0284c7; background-color:#e0f2fe; padding:3px 8px; border-radius:6px; margin-left:8px;">{zone_val}</span>'
             else:
                 plan_label = ""
