@@ -87,7 +87,8 @@ def get_summary(file_map, mode="river"):
                     "지역명": region, "필지수": len(df_clean), "국유지(필지)": nat_count, "사유지(필지)": len(df_clean)-nat_count,
                     "지적면적(㎡)": df_clean['지적'].sum(), "편입면적(㎡)": df_clean['편입'].sum()
                 })
-            except: pass
+            except Exception as e: 
+                pass
     return pd.DataFrame(data_list)
 
 @st.cache_data
@@ -112,10 +113,26 @@ def load_file(path, mode="river"):
         if mode == "delete":
             df = df_raw.iloc[:, :11].copy()
             df.columns = cols + ['계획', '주소', '성명']
+            
         elif mode == "flood":
-            # I열(인덱스 8)을 '홍수구역'으로 가져옴
-            df = df_raw.iloc[:, [0, 1, 2, 3, 4, 5, 6, 7, 8, -2, -1]].copy()
+            # 엑셀 파일 열 개수에 따라 유동적으로 컬럼을 가져오도록 수정 (IndexError 방지)
+            num_cols = len(df_raw.columns)
+            base_cols = [0, 1, 2, 3, 4, 5, 6, 7] # 기본 8개 컬럼
+            
+            # I열(인덱스 8)이 존재하는지 확인 후 추가
+            if num_cols > 8:
+                base_cols.append(8)
+            else:
+                df_raw['임시홍수구역'] = ''
+                base_cols.append(num_cols) # 새로 추가된 빈 열 참조
+                
+            # 뒤에서 두 번째(주소), 마지막(성명) 열 가져오기
+            addr_idx = num_cols - 2 if num_cols >= 10 else (num_cols - 1 if num_cols > 8 else 0)
+            name_idx = num_cols - 1
+            
+            df = df_raw.iloc[:, base_cols + [addr_idx, name_idx]].copy()
             df.columns = cols + ['홍수구역', '주소', '성명']
+            
         else: # river
             df = df_raw.iloc[:, :10].copy()
             df.columns = cols + ['주소', '성명']
@@ -123,7 +140,9 @@ def load_file(path, mode="river"):
         df['지적'] = pd.to_numeric(df['지적'], errors='coerce').fillna(0)
         df['편입'] = pd.to_numeric(df['편입'], errors='coerce').fillna(0)
         return df
-    except: return None
+    except Exception as e:
+        st.error(f"파일을 불러오는 중 오류가 발생했습니다: {e}")
+        return None
 
 # 파일 리스트 매핑
 river_files = { "예천군": "01_yecheon.xlsm", "구미시": "02_gumi.xlsm", "의성군": "08_uiseong.xlsm", "칠곡군": "09_chilgok.xlsm", "성주군": "11_seongju.xlsm", "고령군": "03_goryeong.xlsm", "달성군": "04_dalseong.xlsm", "문경시": "06_mungyeong.xlsm", "안동시": "07_andong.xlsm", "상주시": "10_sangju.xlsm", "달서구": "05_dalseo.xlsm" }
@@ -170,7 +189,6 @@ with tab0:
             </div>
         """, unsafe_allow_html=True)
         
-        # --- [수정됨: 구분이 확 되는 다채로운 색상표 적용] ---
         st.markdown(f"**📊 {mode_name} 지역별 편입면적 점유율**")
         chart_df = sum_df[sum_df["편입면적(㎡)"] > 0]
         
@@ -179,7 +197,7 @@ with tab0:
             values="편입면적(㎡)",
             names="지역명",
             hole=0.45, 
-            color_discrete_sequence=px.colors.qualitative.Set2 # 파란색 그라데이션에서 확 구분되는 파스텔톤 컬러셋으로 변경!
+            color_discrete_sequence=px.colors.qualitative.Set2
         )
         fig.update_traces(
             textposition='inside',
@@ -193,11 +211,11 @@ with tab0:
             legend=dict(orientation="h", yanchor="bottom", y=-0.2, xanchor="center", x=0.5)
         )
         st.plotly_chart(fig, use_container_width=True)
-        # --------------------------------------------------
 
         st.markdown("**지역별 상세 현황표**")
         st.dataframe(sum_df.style.format({"필지수": "{:,}", "국유지(필지)": "{:,}", "사유지(필지)": "{:,}", "지적면적(㎡)": "{:,.0f}", "편입면적(㎡)": "{:,.0f}"}), use_container_width=True, hide_index=True)
-    else: st.info(f"{mode_name} 데이터 파일이 존재하지 않습니다.")
+    else: 
+        st.info(f"{mode_name} 데이터 파일이 존재하지 않습니다.")
 
 # --- [카드 출력 공통 함수] ---
 def display_cards(res_df, mode="river"):
@@ -246,6 +264,7 @@ with tab1:
         if df is not None:
             dong = st.selectbox("동/리", options=["전체"] + sorted(df['동리'].dropna().unique().tolist()), key="r_dong")
             jb = st.text_input("지번 입력", key="r_jb")
+            
     if df is not None:
         res = df.copy()
         if dong != "전체": res = res[res['동리'] == dong]
@@ -255,11 +274,10 @@ with tab1:
 
 # --- [Tab 2: 폐천부지 조회] ---
 with tab2:
-    st.markdown('<div class="filter-box">**관리계획 필터**', unsafe_allow_html=True)
+    st.markdown('<div class="filter-box">**관리계획 필터**</div>', unsafe_allow_html=True)
     c1, c2 = st.columns(2)
     with c1: check_bojeon = st.checkbox("보전", value=True)
     with c2: check_cheobun = st.checkbox("처분", value=True)
-    st.markdown('</div>', unsafe_allow_html=True)
 
     with st.popover("상세 지역 검색"):
         df_d_all = load_file(DELETE_ALL_FILE, "delete")
