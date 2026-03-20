@@ -7,20 +7,19 @@ import plotly.express as px
 # 1. 페이지 설정
 st.set_page_config(page_title="낙동강 상류 조서 조회 서비스", layout="wide", initial_sidebar_state="collapsed")
 
-# 2. 유신 시그니처 테마 (Professional Deep Ocean & Glassmorphism)
+# 2. 유신 시그니처 테마 및 지목별 색상 스타일 정의
 st.markdown("""
     <style>
-    /* 전체 배경: 눈이 편안한 Off-white */
+    /* 전체 배경 및 폰트 */
     .stApp { background-color: #f8fafc; }
     html, body { font-size: 0.98rem; font-family: 'Pretendard', sans-serif; }
     
-    /* 타이틀 스타일 (No Emoji) */
     .main-service-title { 
         font-size: 1.1rem !important; font-weight: 800; color: #1e3a8a; 
         text-align: center; margin-bottom: 25px; letter-spacing: -0.02em;
     }
     
-    /* 현황 전환 버튼 스타일 */
+    /* 버튼 스타일 */
     .stButton > button { 
         width: 100%; border-radius: 10px; font-weight: 700; height: 45px; 
         border: 1px solid #e2e8f0; background-color: white; color: #475569;
@@ -52,7 +51,7 @@ st.markdown("""
     .address-text { font-size: 1.05rem; font-weight: 800; color: #0f172a; line-height: 1.5; }
     .owner-badge { font-size: 0.8rem; font-weight: 700; color: #1e3a8a; background-color: #eff6ff; padding: 4px 12px; border-radius: 8px; border: 1px solid #dbeafe; }
     
-    .info-container { display: flex; justify-content: space-between; background: rgba(255, 255, 255, 0.6); padding: 14px; border-radius: 12px; margin-top: 10px; }
+    .info-container { display: flex; justify-content: space-between; background: rgba(248, 250, 252, 0.8); padding: 14px; border-radius: 12px; margin-top: 10px; }
     
     .map-btn { 
         display: block; text-align: center; background-color: #03c75a !important; color: white !important; 
@@ -65,6 +64,25 @@ st.markdown("""
     div[data-testid="stPopover"] > button { width: 100%; height: 45px !important; font-size: 0.85rem !important; font-weight: 800 !important; background-color: #2563eb !important; color: white !important; border-radius: 10px !important; }
     </style>
 """, unsafe_allow_html=True)
+
+# [지목별 색상 매핑 함수]
+def get_land_style(land_type):
+    # (배경색, 글자색)
+    styles = {
+        "대": ("#fef3c7", "#92400e"), # 대지: 노랑
+        "전": ("#f0fdf4", "#166534"), # 밭: 연초록
+        "답": ("#f0fdf4", "#166534"), # 논: 연초록
+        "과": ("#f0fdf4", "#166534"), # 과수원: 연초록
+        "임": ("#ecfdf5", "#065f46"), # 임야: 진초록
+        "천": ("#eff6ff", "#1e40af"), # 하천: 파랑
+        "구": ("#eff6ff", "#1e40af"), # 구거: 파랑
+        "유": ("#eff6ff", "#1e40af"), # 유지: 파랑
+        "도로": ("#f1f5f9", "#475569"), # 도로: 회색
+        "공": ("#faf5ff", "#6b21a8"), # 공원: 보라
+        "잡": ("#fff1f2", "#9f1239"), # 잡종지: 핑크
+    }
+    bg, fg = styles.get(land_type, ("#f8fafc", "#64748b")) # 기본값: 연회색
+    return f"background-color: {bg}; color: {fg}; border: 1px solid {fg}44;"
 
 # [데이터 로직]
 @st.cache_data
@@ -134,8 +152,52 @@ DELETE_ALL_FILE = "01_all_delete.xlsm"
 FLOOD_ALL_FILE = "01_all_flood.xlsm"
 
 st.markdown('<p class="main-service-title">낙동강 상류 조서 조회 서비스</p>', unsafe_allow_html=True)
-# 탭에서 이모지 제거
 tab0, tab1, tab2, tab3 = st.tabs(["통합 요약 현황", "하천구역 조회", "폐천부지 조회", "홍수관리구역 조회"])
+
+# --- [카드 출력 공통 함수] ---
+def display_cards(res_df, mode="river"):
+    for _, row in res_df.head(30).iterrows():
+        full_addr = f"{row['시군']} {row['읍면']} {row['동리']} {row['번지']}".replace('nan', '').strip()
+        encoded_addr = urllib.parse.quote(full_addr)
+        owner = str(row['성명']).strip() if str(row['성명']).strip() != '국' else str(row['주소']).strip()
+        
+        # 지목 정보 및 스타일 적용
+        land_type = str(row.get('지목', '-')).strip()
+        land_style = get_land_style(land_type)
+        
+        card_cls = "property-card"
+        plan_label = ""
+        if mode == "delete":
+            p_val = str(row['계획']).strip()
+            card_cls += f" abandoned-card-{p_val}" if p_val in ["보전", "처분"] else ""
+            plan_label = f'<span style="font-size:0.75rem; font-weight:800;">({p_val})</span>'
+        elif mode == "flood":
+            card_cls += " national-card" if str(row['성명']).strip() == '국' else " private-card"
+            zv = str(row.get('홍수구역', '')).strip()
+            if zv not in ['nan', 'None', '']: plan_label = f'<span style="font-size:0.75rem; background-color:#e0f2fe; padding:2px 6px; border-radius:4px;">{zv}</span>'
+        else: card_cls += " national-card" if str(row['성명']).strip() == '국' else " private-card"
+
+        st.markdown(f"""
+            <div class="{card_cls}">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                    <div>
+                        <span class="address-text">{full_addr} {plan_label}</span>
+                        <span style="font-size:0.72rem; padding:2px 8px; border-radius:5px; margin-left:6px; font-weight:700; {land_style}">{land_type}</span>
+                    </div>
+                    <span class="owner-badge">{owner}</span>
+                </div>
+                <div class="info-container">
+                    <div style="flex:1;"><span style="font-size:0.72rem; color:#64748b;">지목</span><br/><b style="color:#475569;">{land_type}</b></div>
+                    <div style="flex:1; text-align:center; border-left:1px solid #e2e8f0; border-right:1px solid #e2e8f0;">
+                        <span style="font-size:0.72rem; color:#64748b;">지적</span><br/><b>{row['지적']:,}㎡</b>
+                    </div>
+                    <div style="flex:1; text-align:right;">
+                        <span style="font-size:0.72rem; color:#dc2626;">편입</span><br/><b style="color:#dc2626;">{row['편입']:,}㎡</b>
+                    </div>
+                </div>
+                <a href="https://map.naver.com/v5/search/{encoded_addr}" target="_blank" class="map-btn">지도 확인</a>
+            </div>
+        """, unsafe_allow_html=True)
 
 # --- [Tab 0: 통합 요약 현황] ---
 with tab0:
@@ -164,38 +226,6 @@ with tab0:
         st.plotly_chart(px.pie(sum_df[sum_df["편입면적(㎡)"] > 0], values="편입면적(㎡)", names="지역명", hole=0.4, color_discrete_sequence=px.colors.qualitative.Pastel), use_container_width=True)
         st.dataframe(sum_df, use_container_width=True, hide_index=True)
 
-# --- [카드 출력 공통 함수] ---
-def display_cards(res_df, mode="river"):
-    for _, row in res_df.head(30).iterrows():
-        full_addr = f"{row['시군']} {row['읍면']} {row['동리']} {row['번지']}".replace('nan', '').strip()
-        encoded_addr = urllib.parse.quote(full_addr)
-        owner = str(row['성명']).strip() if str(row['성명']).strip() != '국' else str(row['주소']).strip()
-        card_cls = "property-card"
-        plan_label = ""
-        if mode == "delete":
-            p_val = str(row['계획']).strip()
-            card_cls += f" abandoned-card-{p_val}" if p_val in ["보전", "처분"] else ""
-            plan_label = f'<span style="font-size:0.75rem; font-weight:800;">({p_val})</span>'
-        elif mode == "flood":
-            card_cls += " national-card" if str(row['성명']).strip() == '국' else " private-card"
-            zv = str(row.get('홍수구역', '')).strip()
-            if zv not in ['nan', 'None', '']: plan_label = f'<span style="font-size:0.75rem; background-color:#e0f2fe; padding:2px 6px; border-radius:4px;">{zv}</span>'
-        else: card_cls += " national-card" if str(row['성명']).strip() == '국' else " private-card"
-
-        st.markdown(f"""
-            <div class="{card_cls}">
-                <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
-                    <span class="address-text">{full_addr} {plan_label}</span>
-                    <span class="owner-badge">{owner}</span>
-                </div>
-                <div class="info-container">
-                    <div><span style="font-size:0.75rem; color:#64748b;">지적</span><br/><b>{row['지적']:,}㎡</b></div>
-                    <div style="text-align:right;"><span style="font-size:0.75rem; color:#dc2626;">편입</span><br/><b style="color:#dc2626;">{row['편입']:,}㎡</b></div>
-                </div>
-                <a href="https://map.naver.com/v5/search/{encoded_addr}" target="_blank" class="map-btn">지도 확인</a>
-            </div>
-        """, unsafe_allow_html=True)
-
 # --- [Tab 1: 하천구역 조회] ---
 with tab1:
     with st.popover("지역 및 지번 검색"):
@@ -213,7 +243,6 @@ with tab1:
 
 # --- [Tab 2: 폐천부지 조회] ---
 with tab2:
-    # 1. 보전/처분 필터 복구
     st.markdown('<div class="filter-box"><b>관리계획 필터</b></div>', unsafe_allow_html=True)
     f_c1, f_c2 = st.columns(2)
     with f_c1: check_bojeon = st.checkbox("보전", value=True, key="f_bojeon")
@@ -230,8 +259,6 @@ with tab2:
     
     if df_d is not None:
         res_d = df_d.copy()
-        
-        # 필터 로직 적용
         status_list = []
         if check_bojeon: status_list.append("보전")
         if check_cheobun: status_list.append("처분")
